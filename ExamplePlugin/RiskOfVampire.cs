@@ -177,7 +177,7 @@ namespace Mochi_Destiny
                     // FixedUpdateからのHealはprocChainMaskがRepeatHealになってる
                     //if (nonRegen && this.repeatHealComponent && !procChainMask.HasProc(ProcType.RepeatHeal))
                     // HealperSecond
-                    self.repeatHealComponent.healthFractionToRestorePerSecond = 0.1f / (1f + (float)self.itemCounts.repeatHeal);
+                    self.repeatHealComponent.healthFractionToRestorePerSecond = HealPerSecond.Value / (1f + (float)self.itemCounts.repeatHeal);
                     self.repeatHealComponent.AddReserve(amount * (float)(1 + self.itemCounts.repeatHeal), self.fullHealth*2f);
                     return 0f;
                 }
@@ -506,6 +506,7 @@ namespace Mochi_Destiny
                 Log.LogInfo("Player pressed F5.");
                 // configをreloadして反映させる
                 Config.Reload();
+                LoadConfig();
 
 
                 //PickupDropletController.CreatePickupDroplet(PickupCatalog.FindPickupIndex(myItemDef.itemIndex), transform.position, transform.forward * 20f);
