@@ -1,6 +1,6 @@
 ﻿using BepInEx.Logging;
 
-namespace ExamplePlugin
+namespace Mochi_Destiny
 {
     internal static class Log
     {
