@@ -128,6 +128,7 @@ namespace Mochi_Destiny
             On.RoR2.HealthComponent.Heal += (orig, self, amount, procChainMask, nonRegen) =>
             {
                 // Void Fungus = MushroomVoid, id 119
+                // Void Fungusはきちんと経時ヒールの対象になってて、10%制限に引っかかってるから良し！
                 if (!NetworkServer.active)
                 {
                     return 0f;

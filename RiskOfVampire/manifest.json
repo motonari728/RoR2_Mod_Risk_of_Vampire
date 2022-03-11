@@ -1,7 +1,7 @@
 ﻿{
 	"name": "Risk_of_Vampire",
 	"version_number": "1.0.0",
-	"website_url": "",
+	"website_url": "https://github.com/motonari728/RoR2_Destiny_Mod",
 	"description": "Introduce new mode. Inspired by Vampire Survivors.",
 	"dependencies": [
 		"bbepis-BepInExPack-5.4.19",
