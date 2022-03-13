@@ -56,6 +56,8 @@ namespace Mochi_Destiny
         private static ConfigEntry<float> InvTime;
         private static ConfigEntry<float> OspPercent;
         private static ConfigEntry<float> HealPerSecond;
+        private static ConfigEntry<float> PossessedItemChance;
+        private static ConfigEntry<float> MoneyScaling;
 
         public List<HealInfo> healHistory =  new();
         public class HealInfo
@@ -89,13 +91,12 @@ namespace Mochi_Destiny
             HooksForLog();
             HookMonsterSpawn();
             HookHeal();
-            Hooh_HPDefine();
-
+            Hook_HPDefine();
 
             //Log.LogInfo(nameof(Awake) + " done.");
         }
 
-        private static void Hooh_HPDefine()
+        private static void Hook_HPDefine()
         {
             On.RoR2.CharacterBody.RecalculateStats += (orig, self) =>
             {
@@ -227,7 +228,7 @@ namespace Mochi_Destiny
             On.RoR2.Run.GetDifficultyScaledCost_int_float += (orig, self, baseCost, difficultyCoefficient) =>
             {
                 //return (int)((float)baseCost * Mathf.Pow(difficultyCoefficient, 1.25f));
-                return (int)((float)baseCost * 1.25 * Mathf.Pow(difficultyCoefficient, 1.60f));
+                return (int)((float)baseCost * Mathf.Pow(difficultyCoefficient, MoneyScaling.Value));
             };
         }
 
@@ -242,9 +243,11 @@ namespace Mochi_Destiny
 
         private void LoadConfig()
         {
-            InvTime = Config.Bind("OSP", "Invulnerable Time", 1f, new ConfigDescription("The amount of time a player remains invulnerable after one shot protection is triggered. Vanilla is 0.1"));
-            OspPercent = Config.Bind("OSP", "OSP Threshold", 0.4f, new ConfigDescription("Max receive damage / Max HP"));
-            HealPerSecond = Config.Bind("Stats", "Max Heal per second", 0.1f, new ConfigDescription("Max Heal per second. Store overflow to next seconds. Store limit is 200% HP."));
+            InvTime = Config.Bind("OSP", "Invulnerable Time", 0.5f, new ConfigDescription("The amount of time a player remains invulnerable after one shot protection is triggered. Vanilla is 0.1."));
+            OspPercent = Config.Bind("OSP", "OSP Threshold", 0.8f, new ConfigDescription("Max receive damage / Max HP. Vanilla is 0.9"));
+            HealPerSecond = Config.Bind("Stats", "Max Heal per second", 0.1f, new ConfigDescription("Max Heal per second. Store overflow to next seconds. Store limit is 200% HP. Vanilla is 1.0"));
+            PossessedItemChance = Config.Bind("Chance", "Possessed Item Chance", 0.5f, new ConfigDescription("The Chance Possessed item is added to itemPicker. If you want 40%, write 0.4."));
+            MoneyScaling = Config.Bind("Scaling", "Money Scaling", 1.45f, new ConfigDescription("How much money needed for opening chests. Normal 1.25. Code: `baseCost * Mathf.Pow(difficultyCoefficient, MoneyScaling.Value)`"));
         }
 
         private void HookOSP()
@@ -411,12 +414,21 @@ namespace Mochi_Destiny
                         // canScrapのみにすると、void itemが選ばれなくなる
                         if (itemDef.canRemove && !itemDef.hidden)
                         {
+                            if (PossessedItemChance.Value > UnityEngine.Random.value)
+                            {
+                                continue;
+                            }
+                            if (itemDef.tier == ItemTier.NoTier || itemDef.tier == ItemTier.Lunar)
+                            {
+                                continue;
+                            }
                             if (itemDef.tier == ItemTier.Tier2 || itemDef.tier == ItemTier.VoidTier2)
                             {
                                 if (UnityEngine.Random.value > 1 / 3)
                                     continue;
                             }
-                            else if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3)
+                            else if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3 
+                                || itemDef.tier == ItemTier.Boss || itemDef.tier == ItemTier.VoidBoss)
                             {
                                 if (UnityEngine.Random.value > 1 / 10)
                                     continue;
@@ -431,7 +443,7 @@ namespace Mochi_Destiny
 
                     // もともと設定してあったoptionsを追加
                     // かならず一つは加える
-                    list.Add(self.options[0]);
+                    //list.Add(self.options[0]);
                     //for (int i = 0; i < self.options.Length; i++)
                     //{
                     //    list.Add(self.options[i]);
@@ -439,9 +451,14 @@ namespace Mochi_Destiny
 
                     // 3以下のときはもう1つ加える
                     // 別の人が開けた場合、optionsは2つしか入っていない。３つ目はないものとして扱うこと！
-                    if (self.options.Count() <= 3)
+                    //if (self.options.Count() <= 3)
+                    //{
+                    //    list.Add(self.options[1]);
+                    //}
+
+                    for (var i = 0; i < self.options.Length; i++)
                     {
-                        list.Add(self.options[1]);
+                        list.Add(self.options[i]);
                     }
 
                     // shuffleして先頭3つだけ残す
@@ -471,7 +488,7 @@ namespace Mochi_Destiny
             this.difficulty4Def.iconSprite = MonsoonIcon;
             this.difficulty4Index = DifficultyAPI.AddDifficulty(this.difficulty4Def);
             LanguageAPI.Add(this.difficulty4Def.nameToken, "Destiny");
-            LanguageAPI.Add(this.difficulty4Def.descriptionToken, "Difficulty Scaling: <style=cIsHealth>400%</style></style>");
+            LanguageAPI.Add(this.difficulty4Def.descriptionToken, "Difficulty Scaling: <style=cIsHealth>+100%</style></style>");
 
             this.difficulty45Def = new DifficultyDef(4.5f, "DestinyDifficulty_45_NAME", "Step13", "DestinyDifficulty_45_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
@@ -479,7 +496,7 @@ namespace Mochi_Destiny
             this.difficulty45Def.iconSprite = MonsoonIcon;
             this.difficulty45Index = DifficultyAPI.AddDifficulty(this.difficulty45Def);
             LanguageAPI.Add(this.difficulty45Def.nameToken, "Destiny");
-            LanguageAPI.Add(this.difficulty45Def.descriptionToken, "Difficulty Scaling: <style=cIsHealth>450%</style></style>");
+            LanguageAPI.Add(this.difficulty45Def.descriptionToken, "Difficulty Scaling: <style=cIsHealth>+125%</style></style>");
 
             this.difficulty5Def = new DifficultyDef(5f, "DestinyDifficulty_5_NAME", "Step13", "DestinyDifficulty_5_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
@@ -487,7 +504,7 @@ namespace Mochi_Destiny
             this.difficulty5Def.iconSprite = MonsoonIcon;
             this.difficulty5Index = DifficultyAPI.AddDifficulty(this.difficulty5Def);
             LanguageAPI.Add(this.difficulty5Def.nameToken, "Destiny");
-            LanguageAPI.Add(this.difficulty5Def.descriptionToken, "Difficulty Scaling: <style=cIsHealth>500%</style></style>");
+            LanguageAPI.Add(this.difficulty5Def.descriptionToken, "Difficulty Scaling: <style=cIsHealth>+150%.</style> Game will kill you.</style>");
 
             //Logger.LogInfo(DifficultyCatalog.difficultyDefs);
         }

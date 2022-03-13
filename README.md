@@ -16,6 +16,14 @@ It has increased the amount of coins needed to open the chest. Besides that, we 
 
 If you have any problems or want to make adjustments, please contact [GitHub](https://github.com/motonari728/RoR2_Destiny_Mod) or Risk_of_Rain2 (JP) Discord(https://discord.gg/jTbthYJ).
 
+### Percentage of items appearing from picker
+--White item: 100%
+--Green item: 33%
+--Red item: 10%
+--Boss item: 10%
+--Lunar item: 10%
+--Corrupt(Void) item: See probability of original item
+
 ### Difficulty adjustment
 It's easy because you can choose the item. So I added 3 more difficult difficulty harder than Monsoon.
 - Difficulty 400%
@@ -57,6 +65,14 @@ Monsoonでの序盤の退屈さを軽減するために、序盤の敵のスポ�
 
 なにか問題がある場合や、調整が欲しい場合は[GitHub](https://github.com/motonari728/RoR2_Destiny_Mod)かRisk_of_Rain2(JP) Discord(https://discord.gg/jTbthYJ) までお願いします。
 
+### アイテムピッカーからのアイテムの出現割合
+- White item: 100%
+- Green item: 33%
+- Red item: 10%
+- Boss item: 10%
+- Lunar item: 10%
+- Corrupt(Void) item: 元のアイテムの確率を参照
+
 ### 難易度調節
 アイテムが選べるので、簡単になります。そこでMonsoonよりさらに難しい難易度を３つ追加しました。
 - 難易度 400%
@@ -83,6 +99,10 @@ Monsoonでの序盤の退屈さを軽減するために、序盤の敵のスポ�
 Modが入った人同士で問題なく動くことを確認しています。
 
 ## Changelog
+**1.0.2**
+- The probability that a boss item will be added to a candidate has been reduced to 1/10.
+- Void items are no longer added to candidates.
+
 **1.0.1**
 - Update Readme
 
