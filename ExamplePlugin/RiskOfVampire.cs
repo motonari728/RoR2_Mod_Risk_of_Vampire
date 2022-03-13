@@ -246,7 +246,7 @@ namespace Mochi_Destiny
             InvTime = Config.Bind("OSP", "Invulnerable Time", 0.5f, new ConfigDescription("The amount of time a player remains invulnerable after one shot protection is triggered. Vanilla is 0.1."));
             OspPercent = Config.Bind("OSP", "OSP Threshold", 0.8f, new ConfigDescription("Max receive damage / Max HP. Vanilla is 0.9"));
             HealPerSecond = Config.Bind("Stats", "Max Heal per second", 0.1f, new ConfigDescription("Max Heal per second. Store overflow to next seconds. Store limit is 200% HP. Vanilla is 1.0"));
-            PossessedItemChance = Config.Bind("Chance", "Possessed Item Chance", 0.5f, new ConfigDescription("The Chance Possessed item is added to itemPicker. If you want 40%, write 0.4."));
+            PossessedItemChance = Config.Bind("Chance", "Possessed Item Chance", 0.75f, new ConfigDescription("The probability that your owned item is added to the item picker's item candidates."));
             MoneyScaling = Config.Bind("Scaling", "Money Scaling", 1.45f, new ConfigDescription("How much money needed for opening chests. Normal 1.25. Code: `baseCost * Mathf.Pow(difficultyCoefficient, MoneyScaling.Value)`"));
         }
 
