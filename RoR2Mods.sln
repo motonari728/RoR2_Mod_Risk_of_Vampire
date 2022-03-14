@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RiskOfVampire", "RiskOfVamp
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Metadata", "Metadata", "{3A26DDA8-2697-4D64-962B-DB9E2DC00EF6}"
 	ProjectSection(SolutionItems) = preProject
-		RiskOfVampire\manifest.json = RiskOfVampire\manifest.json
+		Releases\manifest.json = Releases\manifest.json
 		README.md = README.md
 		RiskOfVampire\RiskOfVampire.dll = RiskOfVampire\RiskOfVampire.dll
 	EndProjectSection

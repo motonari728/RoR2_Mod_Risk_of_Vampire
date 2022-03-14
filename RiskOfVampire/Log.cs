@@ -1,6 +1,6 @@
 ﻿using BepInEx.Logging;
 
-namespace Mochi_Destiny
+namespace RiskOfVampire
 {
     internal static class Log
     {

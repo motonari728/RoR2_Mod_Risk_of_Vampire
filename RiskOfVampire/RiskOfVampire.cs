@@ -1,6 +1,7 @@
 ﻿using BepInEx;
 using R2API;
 using R2API.Utils;
+using R2API.Networking;
 using RoR2;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -12,21 +13,22 @@ using UnityEngine.Networking;
 using BepInEx.Configuration;
 using MonoMod.Cil;
 using System;
+using R2API.Networking.Interfaces;
 
 #pragma warning disable Publicizer001 // Accessing a member that was not originally public
-namespace Mochi_Destiny
+namespace RiskOfVampire
 {
     //You don't need this if you're not using R2API in your plugin, it's just to tell BepInEx to initialize R2API before this plugin so it's safe to use R2API.
     [BepInDependency(R2API.R2API.PluginGUID)]
-	
-	//This attribute is required, and lists metadata for your plugin.
+
+    //This attribute is required, and lists metadata for your plugin.
     [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
-    [R2APISubmoduleDependency(nameof(ItemAPI), nameof(LanguageAPI), nameof(DifficultyAPI))]
-	
-	//This is the main declaration of our plugin class. BepInEx searches for all classes inheriting from BaseUnityPlugin to initialize on startup.
+    [R2APISubmoduleDependency(nameof(ItemAPI), nameof(LanguageAPI), nameof(DifficultyAPI), nameof(DirectorAPI), nameof(NetworkingAPI))]
+
+    //This is the main declaration of our plugin class. BepInEx searches for all classes inheriting from BaseUnityPlugin to initialize on startup.
     //BaseUnityPlugin itself inherits from MonoBehaviour, so you can use this as a reference for what you can declare and use in your plugin class.
     public class RiskOfVampire : BaseUnityPlugin
-	{
+    {
         public const string PluginGUID = PluginAuthor + "." + PluginName;
         public const string PluginAuthor = "mochi";
         // PluginNameに空白を入れると読み込まれない
@@ -35,7 +37,7 @@ namespace Mochi_Destiny
 
         //protected ConfigFile Config { get; }
 
-		//We need our item definition to persist through our functions, and therefore make it a class field.
+        //We need our item definition to persist through our functions, and therefore make it a class field.
         //private static ItemDef myItemDef;
 
         //public GameObject pickupMystery;
@@ -59,18 +61,22 @@ namespace Mochi_Destiny
         private static ConfigEntry<float> PossessedItemChance;
         private static ConfigEntry<float> MoneyScaling;
 
-        public List<HealInfo> healHistory =  new();
-        public class HealInfo
-        {
-            public float amount;
-            public float time;
+        public static float invTime;
+        public static float ospPercent;
+        public static float healPerSecond;
+        public static float possessedItemChance;
+        public static float moneyScaling;
 
-            public HealInfo(float amount, float time)
-            {
-                this.amount = amount;
-                this.time = time;
-            }
-        }
+        private static ConfigEntry<float> MultiShopSpawnChance;
+        private static ConfigEntry<float> ScrapperSpawnChance;
+        private static ConfigEntry<float> PrinterSpawnChance;
+        private static ConfigEntry<float> ChanceShrineSpawnChance;
+
+        public static float multiShopSpawnChance;
+        public static float scrapperSpawnChance;
+        public static float printerSpawnChance;
+        public static float chanceShrineSpawnChance;
+
 
         // ゲームの起動時に呼ばれる
         public void Awake()
@@ -78,7 +84,6 @@ namespace Mochi_Destiny
             //Init our logging class so that we can properly log for debugging
             Log.Init(Logger);
 
-            LoadConfig();
 
             LoadAssets();
             DefineDifficulties();
@@ -92,8 +97,90 @@ namespace Mochi_Destiny
             HookMonsterSpawn();
             HookHeal();
             Hook_HPDefine();
+            Hook_Spawns();
+
+            NetworkingAPI.RegisterMessageType<SyncConfig>();
+
+
+            On.RoR2.Run.Start += (orig, self) =>
+            {
+                Logger.LogInfo("Run start");
+                // hostまたは、ソロプレイのとき
+                if (NetworkServer.active)
+                {
+                    BindConfig();
+                }
+                orig(self);
+            };
 
             //Log.LogInfo(nameof(Awake) + " done.");
+        }
+
+        private void Hook_Spawns()
+        {
+            // Remove Interactables
+            On.RoR2.SceneDirector.GenerateInteractableCardSelection += SceneDirector_GenerateInteractableCardSelection;
+        }
+
+        private WeightedSelection<DirectorCard> SceneDirector_GenerateInteractableCardSelection(On.RoR2.SceneDirector.orig_GenerateInteractableCardSelection orig, SceneDirector self)
+        {
+            var weightedSelection = orig(self);
+            for (var i = 0; i < weightedSelection.Count; i++)
+            {
+                var choiceInfo = weightedSelection.GetChoice(i);
+                //var prefabName = choiceInfo.value.spawnCard.prefab.name;
+                SpawnCard spawnCard = choiceInfo.value.spawnCard;
+
+                //if (IsMultiShop(spawnCard) || IsScrapper(spawnCard) || IsPrinter(spawnCard) || IsChanceShrine(spawnCard))
+                //{
+                //    chestChance += choiceInfo.weight;
+                //    choiceInfo.weight = 0f;
+                //    weightedSelection.ModifyChoiceWeight(i, 0);
+                //}
+
+                // MultishopOnly を参考にしてる
+                if (IsMultiShop(spawnCard))
+                {
+                    weightedSelection.ModifyChoiceWeight(i, choiceInfo.weight * MultiShopSpawnChance.Value);
+                }
+                if (IsScrapper(spawnCard))
+                {
+                    weightedSelection.ModifyChoiceWeight(i, choiceInfo.weight * ScrapperSpawnChance.Value);
+                }
+                if (IsPrinter(spawnCard))
+                {
+                    weightedSelection.ModifyChoiceWeight(i, choiceInfo.weight * PrinterSpawnChance.Value);
+                }
+                if (IsChanceShrine(spawnCard))
+                {
+                    weightedSelection.ModifyChoiceWeight(i, choiceInfo.weight * ChanceShrineSpawnChance.Value);
+                }
+            }
+            return weightedSelection;
+        }
+
+        private bool IsMultiShop(SpawnCard spawnCard)
+        {
+            string a = spawnCard.name.ToLower();
+            return a == DirectorAPI.Helpers.InteractableNames.MultiShopCommon.ToLower() || a == DirectorAPI.Helpers.InteractableNames.MultiShopUncommon.ToLower();
+        }
+
+        private bool IsScrapper(SpawnCard spawnCard)
+        {
+            string a = spawnCard.name.ToLower();
+            return a == "iscScrapper".ToLower();
+        }
+
+        private bool IsPrinter(SpawnCard spawnCard)
+        {
+            string a = spawnCard.name.ToLower();
+            return a == DirectorAPI.Helpers.InteractableNames.PrinterCommon.ToLower() || a == DirectorAPI.Helpers.InteractableNames.PrinterUncommon.ToLower() || a == DirectorAPI.Helpers.InteractableNames.PrinterLegendary.ToLower();
+        }
+
+        private bool IsChanceShrine(SpawnCard spawnCard)
+        {
+            string a = spawnCard.name.ToLower();
+            return a == DirectorAPI.Helpers.InteractableNames.ChanceShrine.ToLower();
         }
 
         private static void Hook_HPDefine()
@@ -115,7 +202,6 @@ namespace Mochi_Destiny
 
         private void HookHeal()
         {
-
             On.RoR2.HealthComponent.OnInventoryChanged += (orig, self) =>
             {
                 // repeatHealComponentの付け外しを除去
@@ -178,11 +264,11 @@ namespace Mochi_Destiny
                     // FixedUpdateからのHealはprocChainMaskがRepeatHealになってる
                     //if (nonRegen && this.repeatHealComponent && !procChainMask.HasProc(ProcType.RepeatHeal))
                     // HealperSecond
-                    self.repeatHealComponent.healthFractionToRestorePerSecond = HealPerSecond.Value / (1f + (float)self.itemCounts.repeatHeal);
-                    self.repeatHealComponent.AddReserve(amount * (float)(1 + self.itemCounts.repeatHeal), self.fullHealth*2f);
+                    self.repeatHealComponent.healthFractionToRestorePerSecond = healPerSecond / (1f + (float)self.itemCounts.repeatHeal);
+                    self.repeatHealComponent.AddReserve(amount * (float)(1 + self.itemCounts.repeatHeal), self.fullHealth * 2f);
                     return 0f;
                 }
-                
+
                 // repeatHeal()はorigに任せる
                 // onCharacterHealServerのイベントがorigからしか呼べないので、origを呼び出さないといけない
                 return orig(self, amount, procChainMask, nonRegen);
@@ -228,7 +314,7 @@ namespace Mochi_Destiny
             On.RoR2.Run.GetDifficultyScaledCost_int_float += (orig, self, baseCost, difficultyCoefficient) =>
             {
                 //return (int)((float)baseCost * Mathf.Pow(difficultyCoefficient, 1.25f));
-                return (int)((float)baseCost * Mathf.Pow(difficultyCoefficient, MoneyScaling.Value));
+                return (int)((float)baseCost * Mathf.Pow(difficultyCoefficient, moneyScaling));
             };
         }
 
@@ -241,13 +327,43 @@ namespace Mochi_Destiny
             //};
         }
 
-        private void LoadConfig()
+        [Server]
+        private void BindConfig()
         {
-            InvTime = Config.Bind("OSP", "Invulnerable Time", 0.5f, new ConfigDescription("The amount of time a player remains invulnerable after one shot protection is triggered. Vanilla is 0.1."));
-            OspPercent = Config.Bind("OSP", "OSP Threshold", 0.8f, new ConfigDescription("Max receive damage / Max HP. Vanilla is 0.9"));
-            HealPerSecond = Config.Bind("Stats", "Max Heal per second", 0.1f, new ConfigDescription("Max Heal per second. Store overflow to next seconds. Store limit is 200% HP. Vanilla is 1.0"));
+            // ここはソロプレイでも呼ばれるので気をつける
             PossessedItemChance = Config.Bind("Chance", "Possessed Item Chance", 0.75f, new ConfigDescription("The probability that your owned item is added to the item picker's item candidates."));
-            MoneyScaling = Config.Bind("Scaling", "Money Scaling", 1.45f, new ConfigDescription("How much money needed for opening chests. Normal 1.25. Code: `baseCost * Mathf.Pow(difficultyCoefficient, MoneyScaling.Value)`"));
+            OspPercent = Config.Bind("OSP", "OSP Threshold", 0.8f, new ConfigDescription("Max receive damage / Max HP. Vanilla is 0.9"));
+            InvTime = Config.Bind("OSP", "Invulnerable Time", 0.5f, new ConfigDescription("The amount of time a player remains invulnerable after one shot protection is triggered. Vanilla is 0.1."));
+            MoneyScaling = Config.Bind("Scaling", "Money Scaling", 1.45f, new ConfigDescription("How much money needed for opening chests. Normal 1.25. Code: `baseCost * Mathf.Pow(difficultyCoefficient, moneyScaling)`"));
+            HealPerSecond = Config.Bind("Stats", "Max Heal per second", 0.1f, new ConfigDescription("Max Heal per second. Store overflow to next seconds. Store limit is 200% HP. Vanilla is 1.0"));
+            HealPerSecond = Config.Bind("Stats", "Max Heal per second", 0.1f, new ConfigDescription("Max Heal per second. Store overflow to next seconds. Store limit is 200% HP. Vanilla is 1.0"));
+
+            MultiShopSpawnChance = Config.Bind("Spawn", "MultiShop spawn chance", 0.2f,
+                new ConfigDescription("Multiply the spawn weight of MultiShop. 0 is None. 1 is Original weight"));
+            ScrapperSpawnChance = Config.Bind("Spawn", "Scrapper spawn chance", 0.0f,
+                new ConfigDescription("Multiply the spawn weight of Scrapper. 0 is None. 1 is Original weight"));
+            PrinterSpawnChance = Config.Bind("Spawn", "3D Printer spawn chance", 0.2f,
+                new ConfigDescription("Multiply the spawn weight of 3D Printer. 0 is None. 1 is Original weight"));
+            ChanceShrineSpawnChance = Config.Bind("Spawn", "LuckShrine spawn chance", 0.3f,
+                new ConfigDescription("Multiply the spawn weight of LuckShrine. 0 is None. 1 is Original weight"));
+
+            ReloadConfig();
+        }
+
+        private void ReloadConfig()
+        {
+            // ここはソロプレイでも呼ばれるので気をつける
+            invTime = InvTime.Value;
+            ospPercent = OspPercent.Value;
+            healPerSecond = HealPerSecond.Value;
+            possessedItemChance = PossessedItemChance.Value;
+            moneyScaling = MoneyScaling.Value;
+
+            // Clientに送信
+            if (NetworkServer.active)
+            {
+                new SyncConfig(possessedItemChance, ospPercent, invTime, moneyScaling, healPerSecond).Send(NetworkDestination.Clients);
+            }
         }
 
         private void HookOSP()
@@ -260,20 +376,9 @@ namespace Mochi_Destiny
                     return;
                 }
                 orig(self);
-                self.ospTimer = InvTime.Value;
+                self.ospTimer = invTime;
                 Logger.LogInfo(self.ospTimer);
             };
-
-            //IL.RoR2.HealthComponent.TriggerOneShotProtection += (il) =>
-            //{
-            //    var c = new ILCursor(il);
-            //    c.GotoNext(
-            //        x => x.MatchLdarg(0),
-            //        x => x.MatchLdcR4(0.1f)
-            //        );
-            //    c.Index += 1;
-            //    c.Next.Operand = invTime.Value;
-            //};
 
             On.RoR2.CharacterBody.RecalculateStats += (orig, self) =>
             {
@@ -286,7 +391,7 @@ namespace Mochi_Destiny
                 // もっと高い値に設定し直す
                 // 1 - 0.9 = 0.1
                 // 1 - 0.4 = 0.6
-                float newOspFraction = 1f - OspPercent.Value;
+                float newOspFraction = 1f - ospPercent;
                 // もとがif(NetworkServer.active)の外側なので、ifいらない
                 self.oneShotProtectionFraction = Mathf.Max(0f, newOspFraction - (1f - 1f / self.cursePenalty));
             };
@@ -346,10 +451,34 @@ namespace Mochi_Destiny
                     //vector = rotation * vector;
                     //self.Roll();
 
+                    //{
+                    //    itemTier = ItemTier.Tier2;
+                    //}
+                    //if (this.name == DirectorAPI.Helpers.InteractableNames.LegendaryChest)
+                    //{
+                    //    itemTier = ItemTier.Tier3;
+                    //}
+                    PickupPickerController.Option[] pickerOptions = PickupPickerController.GenerateOptionsFromDropTable(3, self.dropTable, self.rng);
+
+                    // dropletの色を抽選結果の最低値のTierの色にする
+                    ItemTier lowestItemTier = ItemTier.Tier3;
+                    foreach(PickupPickerController.Option option in pickerOptions)
+                    {
+                        ItemTier itemTier = option.pickupIndex.pickupDef.itemTier;
+                        if (itemTier == ItemTier.Tier1 || itemTier == ItemTier.VoidTier1)
+                        {
+                            lowestItemTier = ItemTier.Tier1;
+                            break;
+                        }
+                        if (itemTier == ItemTier.Tier2 || itemTier == ItemTier.VoidTier2)
+                        {
+                            lowestItemTier = ItemTier.Tier2;
+                        }
+                    }
                     PickupDropletController.CreatePickupDroplet(new GenericPickupController.CreatePickupInfo
                     {
-                        pickupIndex = PickupCatalog.FindPickupIndex(ItemTier.Tier1),
-                        pickerOptions = PickupPickerController.GenerateOptionsFromDropTable(3, self.dropTable, self.rng),
+                        pickupIndex = PickupCatalog.FindPickupIndex(lowestItemTier),
+                        pickerOptions = pickerOptions,
                         //pickerOptions = PickupPickerController.SetOptionsFromInteractor(),
                         rotation = Quaternion.identity,
                         prefabOverride = OptionPickup
@@ -367,6 +496,7 @@ namespace Mochi_Destiny
             {
                 // SetOptionsFromInteractor()から内容をコピーした
                 //Logger.LogInfo(activator);
+                //self.
                 if (self.gameObject.name.Contains("Scrapper"))
                 {
                     orig(self, activator);
@@ -401,6 +531,21 @@ namespace Mochi_Destiny
                 // 抽選開始
                 if (self.contextString != "rolled")
                 {
+                    ItemTier lowestItemTier = ItemTier.Tier3;
+                    foreach(PickupPickerController.Option option in self.options)
+                    {
+                        ItemTier itemTier = option.pickupIndex.pickupDef.itemTier;
+                        if (itemTier == ItemTier.Tier1 || itemTier == ItemTier.VoidTier1)
+                        {
+                            lowestItemTier = ItemTier.Tier1;
+                            break;
+                        }
+                        if (itemTier == ItemTier.Tier2 || itemTier == ItemTier.VoidTier2)
+                        {
+                            lowestItemTier = ItemTier.Tier2;
+                        }
+                    }
+
                     // 作成するOption list
                     HashSet<PickupPickerController.Option> list = new HashSet<PickupPickerController.Option>();
                     // item historyから追加
@@ -414,7 +559,30 @@ namespace Mochi_Destiny
                         // canScrapのみにすると、void itemが選ばれなくなる
                         if (itemDef.canRemove && !itemDef.hidden)
                         {
-                            if (PossessedItemChance.Value > UnityEngine.Random.value)
+                            // 最小がTier3の場合
+                            if (lowestItemTier == ItemTier.Tier3)
+                            {
+                                if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3)
+                                {
+                                    // allowed.  Proceed to the next.
+                                } else
+                                {
+                                    continue;
+                                }
+                            }
+                            // 最小がTier2の場合
+                            if (lowestItemTier == ItemTier.Tier2)
+                            {
+                                ItemTier[] allowed = new ItemTier[] { ItemTier.Tier2, ItemTier.VoidTier2, ItemTier.Tier3, ItemTier.VoidTier3 };
+                                if (allowed.Contains(itemDef.tier))
+                                {
+                                    // allowed. Proceed to the next.
+                                } else
+                                {
+                                    continue;
+                                }
+                            }
+                            if (possessedItemChance > UnityEngine.Random.value)
                             {
                                 continue;
                             }
@@ -456,12 +624,13 @@ namespace Mochi_Destiny
                     //    list.Add(self.options[1]);
                     //}
 
+                    // 以前のoptionsを全部加える
                     for (var i = 0; i < self.options.Length; i++)
                     {
                         list.Add(self.options[i]);
                     }
 
-                    // shuffleして先頭3つだけ残す
+                    // shuffleして先頭nつだけ残す
                     PickupPickerController.Option[] rolledList = list.ToList().OrderBy(x => UnityEngine.Random.value).Take(2).ToArray();
 
                     //Logger.LogInfo(rolledList);
@@ -522,8 +691,13 @@ namespace Mochi_Destiny
 
                 Log.LogInfo("Player pressed F5.");
                 // configをreloadして反映させる
-                Config.Reload();
-                LoadConfig();
+                if (NetworkServer.active)
+                {
+                    Config.Reload();
+                    ReloadConfig();
+                }
+
+                Logger.LogInfo("Config Reload finished");
 
 
                 //PickupDropletController.CreatePickupDroplet(PickupCatalog.FindPickupIndex(myItemDef.itemIndex), transform.position, transform.forward * 20f);

@@ -2,6 +2,10 @@
 
 日本語は後に続きます。(Japanese follow later)
 
+## Update
+Removed Scrappers BeGone and Ephemeral_Coins from dependencies. Please delete it by yourself.
+依存関係からScrappersBeGoneとEphemeral_Coinsを取り除きました。各自で削除してください。
+
 ## English
 A mod inspired by Vampire Survivors[(Steam)](https://store.steampowered.com/app/1794680/Vampire_Survivors/). With a number of changes, we aim to make the game a little more strategic.
 
@@ -16,7 +20,7 @@ I am adding items to the settings and changing the default values. If you update
 <img src = "https://user-images.githubusercontent.com/5510944/157956620-aec42b86-b075-401a-a1d1-3f6002738004.png" width = '50%'>
 <img src = "https://user-images.githubusercontent.com/5510944/157956105-ce9e2cd7-5c95-4690-9254-806d1c274c7f.png" width = '50%'>
 
-If you have any problems or want to make adjustments, please contact [GitHub](https://github.com/motonari728/RoR2_Destiny_Mod) or Risk_of_Rain2 (JP) Discord(https://discord.gg/jTbthYJ).
+If you have any problems or want to make adjustments, please contact [GitHub](https://github.com/motonari728/RoR2_Destiny_Mod) or Risk of Rain2 modding Discord(https://discord.gg/pW97gtA7hC). My discord tag is mochi#9204.
 
 ### Percentage of items appearing from picker
 - White item: 100%
@@ -38,7 +42,8 @@ It's easy because you can choose the item. So I added 3 more difficult difficult
 - Max Heal per Second: Heal is limited to 10% (adjustable) of total HP per second. Carryover is up to 200%. Mainly engineer's fungus countermeasures and prevent to play that recovers instantly.
 - Money Scaling: Scaling the price to open a chest.
 - Possessed Item Chance: The probability that your item will be added to the Item Picker lottery candidates. The higher it is, the easier it is for your items to appear as candidates.
-- You can reload Config with F2 key. (perhaps)
+- The spawn rate of Scrapper, MultiShop, 3D Printer, and Altar of Luck can now be adjusted. It is also possible to set it does not appear.
+- You can reload Config with F2 key.
 
 ### Other changes
 - An item selection orb appears instead of an item from the box
@@ -52,14 +57,6 @@ It's easy because you can choose the item. So I added 3 more difficult difficult
 ### Multiplay
 It is available. In multiplayer, we are developing with the assumption that everyone will include this mod. Please install this mod with clients.
 We have confirmed that people with this mod can multiplay without any problems. 
-
-### Bugs
-- During multiplay, Config refers to each participant's. At the moment, please play with everyone's Config matched.
-- White items come out from big chests and legend chests. This is because your items will be added to the lottery candidates. Will be fixed.
-
-### Dependent Mod
-- For adjustment, remove the participant's Luna coin at the beginning with [Ephemeral Coins].
-- Scrapper breaks the game balance in Risk of Vampire mode, so I put [Scrapper BeGone] in dependency. Scrapper will not be generated.
 
 ---------------------------------------
 ## 日本語
@@ -98,7 +95,8 @@ Monsoonでの序盤の退屈さを軽減するために、序盤の敵のスポ�
 - Max Heal per Second: Healは秒間総HPの10%(調整可)が上限にしています。持ち越しは200%までです。主にエンジニアのきのこ対策と瞬時に回復するプレイを防ぐためです。
 - Money Scaling: チェストを開ける値段のスケーリング。
 - Possessed Item Chance: 所持アイテムがItem Pickerの抽選候補に加えられる確率。高くするほど、所持アイテムが候補に出やすくなります。
-- F2キーでConfigを再読み込みできます。(たぶん)
+- Scrapper, MultiShop, 3D Printer, 運の祭壇の出現率が調整可能になりました。出現しなくなる設定も可能です。
+- F2キーでConfigを再読み込みできます。
 
 ### その他の変更
 - 箱からアイテムの代わりにアイテム選択オーブが出現
@@ -113,15 +111,12 @@ Monsoonでの序盤の退屈さを軽減するために、序盤の敵のスポ�
 利用可能です。マルチプレイでは、全員がこのModを入れることを想定して開発しています。全員Modを入れてご利用ください。
 Modが入った人同士で問題なく動くことを確認しています。
 
-### Bug
-- マルチプレイ時、Configが参加者それぞれのものを参照してしまっています。現時点では、全員のConfigを一致させてプレイしてください。
-- でかいチェストやレジェントチェストから白アイテムが出ます。自分の持ち物が抽選候補に加えられるためです。修正予定。
-
-### 依存Mod
-- 調整のため、[Ephemeral Coins]で開始時に参加者のルナコインを取り除きます。
-- ScrapperはRisk of Vampire modeではゲームバランスを壊すので、生成されないように[ScrapperBeGone]を入れています。
-
 ## Changelog
+**1.0.9**
+- Configs are now synced during multiplayer. Always refer to the host's config.
+- Green and red items are now guaranteed when you open the large and legendary chests.
+- The spawn rate of Scrapper, MultiShop, 3D Printer, and Altar of Luck can now be adjusted.
+
 **1.0.8**
 - Update Readme and config description.
 
