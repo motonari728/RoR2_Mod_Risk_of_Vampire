@@ -1,6 +1,6 @@
 # Risk Of Vampire
 
-This is mod for Risk of Rain2[Steam](https://store.steampowered.com/app/632360/Risk_of_Rain_2/)
+This is mod for Risk of Rain2([Steam](https://store.steampowered.com/app/632360/Risk_of_Rain_2/))
 
 日本語は後に続きます。(Japanese follow later)
 
