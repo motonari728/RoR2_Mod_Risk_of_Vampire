@@ -4,6 +4,7 @@
 
 ## Update
 Removed Scrappers BeGone and Ephemeral_Coins from dependencies. Please delete it by yourself.
+
 依存関係からScrappersBeGoneとEphemeral_Coinsを取り除きました。各自で削除してください。
 
 ## English

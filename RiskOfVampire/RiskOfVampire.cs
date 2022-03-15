@@ -55,27 +55,32 @@ namespace RiskOfVampire
 
         public int ambientLevelFloor = 1;
 
+        // config need to sync
         private static ConfigEntry<float> InvTime;
         private static ConfigEntry<float> OspPercent;
         private static ConfigEntry<float> HealPerSecond;
         private static ConfigEntry<float> PossessedItemChance;
         private static ConfigEntry<float> MoneyScaling;
+        private static ConfigEntry<int> ItemPickerOptionAmount;
+        private static ConfigEntry<int> WhiteItemUpperLimit;
+        private static ConfigEntry<int> GreenItemUpperLimit;
 
+        // server->client sync variable
         public static float invTime;
         public static float ospPercent;
         public static float healPerSecond;
         public static float possessedItemChance;
         public static float moneyScaling;
+        public static int itemPickerOptionAmount;
+        public static int whiteItemUpperLimit;
+        public static int greenItemUpperLimit;
 
+        // config don't need to sync
         private static ConfigEntry<float> MultiShopSpawnChance;
         private static ConfigEntry<float> ScrapperSpawnChance;
         private static ConfigEntry<float> PrinterSpawnChance;
         private static ConfigEntry<float> ChanceShrineSpawnChance;
-
-        public static float multiShopSpawnChance;
-        public static float scrapperSpawnChance;
-        public static float printerSpawnChance;
-        public static float chanceShrineSpawnChance;
+        private static ConfigEntry<float> HealMultiply;
 
 
         // ゲームの起動時に呼ばれる
@@ -187,6 +192,15 @@ namespace RiskOfVampire
         {
             On.RoR2.CharacterBody.RecalculateStats += (orig, self) =>
             {
+
+                // デフォルトの難易度だったら、何もしない
+                // デフォルト難易度は0~, Invalidが-1, 追加難易度は-2から負に向かう
+                if ((int)Run.instance.selectedDifficulty >= -1)
+                {
+                    orig(self);
+                    return;
+                }
+
                 // レベルアップでのHP増加量の調整
                 if (self.isPlayerControlled)
                 {
@@ -204,6 +218,12 @@ namespace RiskOfVampire
         {
             On.RoR2.HealthComponent.OnInventoryChanged += (orig, self) =>
             {
+                // healPerSecondが1なら、もとの挙動のまま
+                if (healPerSecond == 1f)
+                {
+                    orig(self);
+                    return;
+                }
                 // repeatHealComponentの付け外しを除去
                 // それ以外の部分を移植
                 self.itemCounts = default(HealthComponent.ItemCounts);
@@ -220,6 +240,28 @@ namespace RiskOfVampire
                 {
                     return 0f;
                 }
+
+                // 追加難易度かつnonRegenかつRepeatHealでない場合
+                // デフォルト難易度は0~, Invalidが-1, 追加難易度は-2から負に向かう
+
+                // 回復量の調節
+                // すでにDifficultyAPIでcountAsHardModeにしてあるから、Regenerationは*0.6倍になってる
+                // そこでRegen以外を調節する
+
+                // if (difficultyDef.countAshardMode)
+                // characterMaster.inventory.GiveItem(RoR2Content.Items.MonsoonPlayerHelper, 1);
+                // MonsoonPlayerHelper>1のとき、RecalculateStatsでRegenを*0.6
+                if (nonRegen && (int)Run.instance.selectedDifficulty <= -2 && !procChainMask.HasProc(ProcType.RepeatHeal))
+                {
+                    amount *= HealMultiply.Value;
+                }
+
+                // healPerSecondが1のときはもとの挙動のまま
+                if (healPerSecond == 1f)
+                {
+                    return orig(self, amount, procChainMask, nonRegen);
+                }
+
                 // コープスブルーム(repeatHeal)の経時回復機能を使う
                 // repeatHealComponentがついてなかったらつける
                 if (self.body.teamComponent.teamIndex == TeamIndex.Player && self.repeatHealComponent == null)
@@ -331,21 +373,30 @@ namespace RiskOfVampire
         private void BindConfig()
         {
             // ここはソロプレイでも呼ばれるので気をつける
-            PossessedItemChance = Config.Bind("Chance", "Possessed Item Chance", 0.75f, new ConfigDescription("The probability that your owned item is added to the item picker's item candidates."));
-            OspPercent = Config.Bind("OSP", "OSP Threshold", 0.8f, new ConfigDescription("Max receive damage / Max HP. Vanilla is 0.9"));
-            InvTime = Config.Bind("OSP", "Invulnerable Time", 0.5f, new ConfigDescription("The amount of time a player remains invulnerable after one shot protection is triggered. Vanilla is 0.1."));
-            MoneyScaling = Config.Bind("Scaling", "Money Scaling", 1.45f, new ConfigDescription("How much money needed for opening chests. Normal 1.25. Code: `baseCost * Mathf.Pow(difficultyCoefficient, moneyScaling)`"));
-            HealPerSecond = Config.Bind("Stats", "Max Heal per second", 0.1f, new ConfigDescription("Max Heal per second. Store overflow to next seconds. Store limit is 200% HP. Vanilla is 1.0"));
-            HealPerSecond = Config.Bind("Stats", "Max Heal per second", 0.1f, new ConfigDescription("Max Heal per second. Store overflow to next seconds. Store limit is 200% HP. Vanilla is 1.0"));
+            PossessedItemChance = Config.Bind("Chance", "Possessed Item Chance", 0.75f, 
+                new ConfigDescription("The probability that your owned item is added to the item picker's item candidates."));
+            OspPercent = Config.Bind("OSP", "OSP Threshold", 0.8f, 
+                new ConfigDescription("Max receive damage / Max HP. Vanilla is 0.9"));
+            InvTime = Config.Bind("OSP", "Invulnerable Time", 0.5f, 
+                new ConfigDescription("The amount of time a player remains invulnerable after one shot protection is triggered. Vanilla is 0.1."));
+            MoneyScaling = Config.Bind("Scaling", "Money Scaling", 1.45f,
+                new ConfigDescription("How much money needed for opening chests. Normal 1.25. Code: `baseCost * Mathf.Pow(difficultyCoefficient, moneyScaling)`"));
+            HealPerSecond = Config.Bind("Stats", "Max Heal per second", 1f,
+                new ConfigDescription("Max Heal per second. Store overflow to next seconds. Store limit is 200% HP. Enter 1.0 to return to the original behavior."));
 
-            MultiShopSpawnChance = Config.Bind("Spawn", "MultiShop spawn chance", 0.2f,
+            MultiShopSpawnChance = Config.Bind("Spawn", "MultiShop spawn chance", 0.3f,
                 new ConfigDescription("Multiply the spawn weight of MultiShop. 0 is None. 1 is Original weight"));
             ScrapperSpawnChance = Config.Bind("Spawn", "Scrapper spawn chance", 0.0f,
                 new ConfigDescription("Multiply the spawn weight of Scrapper. 0 is None. 1 is Original weight"));
-            PrinterSpawnChance = Config.Bind("Spawn", "3D Printer spawn chance", 0.2f,
+            PrinterSpawnChance = Config.Bind("Spawn", "3D Printer spawn chance", 0.3f,
                 new ConfigDescription("Multiply the spawn weight of 3D Printer. 0 is None. 1 is Original weight"));
-            ChanceShrineSpawnChance = Config.Bind("Spawn", "LuckShrine spawn chance", 0.3f,
+            ChanceShrineSpawnChance = Config.Bind("Spawn", "LuckShrine spawn chance", 0.1f,
                 new ConfigDescription("Multiply the spawn weight of LuckShrine. 0 is None. 1 is Original weight"));
+
+            HealMultiply = Config.Bind("Stats", "Healing amount modify", 0.5f,
+                new ConfigDescription("Multiply the amount of healing. If you enter 0.6, amount of all heal excluding regen will be 60%. Only valid for additional difficulty"));
+            ItemPickerOptionAmount = Config.Bind("Item", "Option amount of ItemPicker", 3,
+                new ConfigDescription("How many candidates are displayed when opeingItemPicker orb spawned from chests."));
 
             ReloadConfig();
         }
@@ -358,11 +409,12 @@ namespace RiskOfVampire
             healPerSecond = HealPerSecond.Value;
             possessedItemChance = PossessedItemChance.Value;
             moneyScaling = MoneyScaling.Value;
+            itemPickerOptionAmount = ItemPickerOptionAmount.Value;
 
             // Clientに送信
             if (NetworkServer.active)
             {
-                new SyncConfig(possessedItemChance, ospPercent, invTime, moneyScaling, healPerSecond).Send(NetworkDestination.Clients);
+                new SyncConfig(possessedItemChance, ospPercent, invTime, moneyScaling, healPerSecond, itemPickerOptionAmount).Send(NetworkDestination.Clients);
             }
         }
 
@@ -447,17 +499,8 @@ namespace RiskOfVampire
                 Quaternion rotation = Quaternion.AngleAxis(angle, Vector3.up);
                 for (int i = 0; i < self.dropCount; i++)
                 {
-                    //PickupDropletController.CreatePickupDroplet(self.dropPickup, self.dropTransform.position + Vector3.up * 1.5f, vector);
-                    //vector = rotation * vector;
-                    //self.Roll();
-
-                    //{
-                    //    itemTier = ItemTier.Tier2;
-                    //}
-                    //if (this.name == DirectorAPI.Helpers.InteractableNames.LegendaryChest)
-                    //{
-                    //    itemTier = ItemTier.Tier3;
-                    //}
+                    // dropTableからの候補の生成
+                    // これが所持アイテムと合わさって最終的な候補となる
                     PickupPickerController.Option[] pickerOptions = PickupPickerController.GenerateOptionsFromDropTable(3, self.dropTable, self.rng);
 
                     // dropletの色を抽選結果の最低値のTierの色にする
@@ -555,67 +598,76 @@ namespace RiskOfVampire
                         ItemDef itemDef = ItemCatalog.GetItemDef(itemIndex);
                         ItemTierDef itemTierDef = ItemTierCatalog.GetItemTierDef(itemDef.tier);
                         PickupIndex pickupIndex = PickupCatalog.FindPickupIndex(itemIndex);
-                        //if ((!itemTierDef || itemTierDef.canScrap) && itemDef.canRemove && !itemDef.hidden && itemDef.DoesNotContainTag(ItemTag.Scrap))
                         // canScrapのみにすると、void itemが選ばれなくなる
-                        if (itemDef.canRemove && !itemDef.hidden)
+                        if (!itemDef)
                         {
-                            // 最小がTier3の場合
-                            if (lowestItemTier == ItemTier.Tier3)
+                            continue;
+                        }
+                        // スクラップアイテムの除去
+                        if (itemDef.ContainsTag(ItemTag.Scrap))
+                        {
+                            continue;
+                        }
+                        if (!itemDef.canRemove || itemDef.hidden)
+                        {
+                            continue;
+                        }
+                        // 使用済みアイテムはNoTier
+                        if (itemDef.tier == ItemTier.NoTier || itemDef.tier == ItemTier.Lunar)
+                        {
+                            continue;
+                        }
+                        // 追加確率の抽選
+                        if (possessedItemChance > UnityEngine.Random.value)
+                        {
+                            continue;
+                        }
+                        // 最小がTier3の場合
+                        if (lowestItemTier == ItemTier.Tier3)
+                        {
+                            if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3)
                             {
-                                if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3)
-                                {
-                                    // allowed.  Proceed to the next.
-                                } else
-                                {
-                                    continue;
-                                }
-                            }
-                            // 最小がTier2の場合
-                            if (lowestItemTier == ItemTier.Tier2)
-                            {
-                                ItemTier[] allowed = new ItemTier[] { ItemTier.Tier2, ItemTier.VoidTier2, ItemTier.Tier3, ItemTier.VoidTier3 };
-                                if (allowed.Contains(itemDef.tier))
-                                {
-                                    // allowed. Proceed to the next.
-                                } else
-                                {
-                                    continue;
-                                }
-                            }
-                            if (possessedItemChance > UnityEngine.Random.value)
+                                // allowed.  Proceed to the next.
+                            } else
                             {
                                 continue;
                             }
-                            if (itemDef.tier == ItemTier.NoTier || itemDef.tier == ItemTier.Lunar)
+                        }
+                        // 最小がTier2の場合
+                        if (lowestItemTier == ItemTier.Tier2)
+                        {
+                            ItemTier[] allowed = new ItemTier[] { ItemTier.Tier2, ItemTier.VoidTier2, ItemTier.Tier3, ItemTier.VoidTier3 };
+                            if (allowed.Contains(itemDef.tier))
+                            {
+                                // allowed. Proceed to the next.
+                            } else
                             {
                                 continue;
                             }
+                        }
+                        // 最小がTier1の場合
+                        if (lowestItemTier != ItemTier.Tier1)
+                        {
+
                             if (itemDef.tier == ItemTier.Tier2 || itemDef.tier == ItemTier.VoidTier2)
                             {
                                 if (UnityEngine.Random.value > 1 / 3)
                                     continue;
                             }
-                            else if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3 
+                            else if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3
                                 || itemDef.tier == ItemTier.Boss || itemDef.tier == ItemTier.VoidBoss)
                             {
                                 if (UnityEngine.Random.value > 1 / 10)
                                     continue;
                             }
-                            list.Add(new PickupPickerController.Option
-                            {
-                                available = true,
-                                pickupIndex = pickupIndex
-                            });
                         }
+                        // 条件を生き残ったやつを候補に追加する
+                        list.Add(new PickupPickerController.Option
+                        {
+                            available = true,
+                            pickupIndex = pickupIndex
+                        });
                     }
-
-                    // もともと設定してあったoptionsを追加
-                    // かならず一つは加える
-                    //list.Add(self.options[0]);
-                    //for (int i = 0; i < self.options.Length; i++)
-                    //{
-                    //    list.Add(self.options[i]);
-                    //}
 
                     // 3以下のときはもう1つ加える
                     // 別の人が開けた場合、optionsは2つしか入っていない。３つ目はないものとして扱うこと！
@@ -631,7 +683,8 @@ namespace RiskOfVampire
                     }
 
                     // shuffleして先頭nつだけ残す
-                    PickupPickerController.Option[] rolledList = list.ToList().OrderBy(x => UnityEngine.Random.value).Take(2).ToArray();
+                    PickupPickerController.Option[] rolledList = list.ToList().OrderBy(x => UnityEngine.Random.value)
+                        .Take(itemPickerOptionAmount).ToArray();
 
                     //Logger.LogInfo(rolledList);
                     self.SetOptionsServer(rolledList);
@@ -657,7 +710,7 @@ namespace RiskOfVampire
             this.difficulty4Def.iconSprite = MonsoonIcon;
             this.difficulty4Index = DifficultyAPI.AddDifficulty(this.difficulty4Def);
             LanguageAPI.Add(this.difficulty4Def.nameToken, "Destiny");
-            LanguageAPI.Add(this.difficulty4Def.descriptionToken, "Difficulty Scaling: <style=cIsHealth>+100%</style></style>");
+            LanguageAPI.Add(this.difficulty4Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+100%</style></style>");
 
             this.difficulty45Def = new DifficultyDef(4.5f, "DestinyDifficulty_45_NAME", "Step13", "DestinyDifficulty_45_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
@@ -665,7 +718,7 @@ namespace RiskOfVampire
             this.difficulty45Def.iconSprite = MonsoonIcon;
             this.difficulty45Index = DifficultyAPI.AddDifficulty(this.difficulty45Def);
             LanguageAPI.Add(this.difficulty45Def.nameToken, "Destiny");
-            LanguageAPI.Add(this.difficulty45Def.descriptionToken, "Difficulty Scaling: <style=cIsHealth>+125%</style></style>");
+            LanguageAPI.Add(this.difficulty45Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+125%</style></style>");
 
             this.difficulty5Def = new DifficultyDef(5f, "DestinyDifficulty_5_NAME", "Step13", "DestinyDifficulty_5_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
@@ -673,7 +726,7 @@ namespace RiskOfVampire
             this.difficulty5Def.iconSprite = MonsoonIcon;
             this.difficulty5Index = DifficultyAPI.AddDifficulty(this.difficulty5Def);
             LanguageAPI.Add(this.difficulty5Def.nameToken, "Destiny");
-            LanguageAPI.Add(this.difficulty5Def.descriptionToken, "Difficulty Scaling: <style=cIsHealth>+150%.</style> Game will kill you.</style>");
+            LanguageAPI.Add(this.difficulty5Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+150%</style></style>");
 
             //Logger.LogInfo(DifficultyCatalog.difficultyDefs);
         }

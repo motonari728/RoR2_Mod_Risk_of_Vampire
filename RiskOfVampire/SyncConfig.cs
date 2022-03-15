@@ -14,18 +14,24 @@ namespace RiskOfVampire
         float invTime;
         float moneyScaling;
         float healPerSecond;
+        int itemPickerOptionAmount;
+        int whiteItemUpperLimit;
+        int greenItemUpperLimit;
 
         public SyncConfig()
         {
         }
 
-        public SyncConfig(float possessedItemChance, float ospPercent, float invTime, float moneyScaling, float healPerSecond)
+        public SyncConfig(float possessedItemChance, float ospPercent, float invTime, float moneyScaling, float healPerSecond, int itemPickerOptionAmount, int whiteItemUpperLimit, int greenItemUpperLimit)
         {
             this.possessedItemChance = possessedItemChance;
             this.ospPercent = ospPercent;
             this.invTime = invTime;
             this.moneyScaling = moneyScaling;
             this.healPerSecond = healPerSecond;
+            this.itemPickerOptionAmount = itemPickerOptionAmount;
+            this.whiteItemUpperLimit = whiteItemUpperLimit;
+            this.greenItemUpperLimit = greenItemUpperLimit;
         }
 
         public void Deserialize(NetworkReader reader)
@@ -35,6 +41,9 @@ namespace RiskOfVampire
             invTime = reader.ReadSingle();
             moneyScaling = reader.ReadSingle();
             healPerSecond = reader.ReadSingle();
+            itemPickerOptionAmount = reader.ReadInt32();
+            whiteItemUpperLimit = reader.ReadInt32();
+            greenItemUpperLimit = reader.ReadInt32();
         }
 
         public void OnReceived()
@@ -49,6 +58,7 @@ namespace RiskOfVampire
             RiskOfVampire.invTime = invTime;
             RiskOfVampire.moneyScaling = moneyScaling;
             RiskOfVampire.healPerSecond = healPerSecond;
+            RiskOfVampire.itemPickerOptionAmount= itemPickerOptionAmount;
 
             Debug.Log("SyncConfig OnReceived");
         }
@@ -60,6 +70,7 @@ namespace RiskOfVampire
             writer.Write(invTime);
             writer.Write(moneyScaling);
             writer.Write(healPerSecond);
+            writer.Write(itemPickerOptionAmount);
         }
     }
 }
