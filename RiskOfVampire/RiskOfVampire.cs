@@ -391,7 +391,7 @@ namespace RiskOfVampire
 
             ItemPickerOptionAmount = Config.Bind("Item", "Option amount of ItemPicker", 3,
                 new ConfigDescription("How many candidates are displayed when opeingItemPicker orb spawned from chests."));
-            WhiteItemUpperLimit = Config.Bind("Item", "White item upper limit", 7,
+            WhiteItemUpperLimit = Config.Bind("Item", "White item upper limit", 6,
                 new ConfigDescription("You can't get new kind of white items when reach this limit. Like Vampire Survivors. You can only get the type of white items you already have."));
             GreenItemUpperLimit = Config.Bind("Item", "Green item upper limit", 4,
                 new ConfigDescription("You can't get new kind of green items when reach this limit. Like Vampire Survivors. You can only get the type of green items you already have."));
@@ -569,6 +569,7 @@ namespace RiskOfVampire
                 // 抽選開始
                 if (self.contextString != "rolled")
                 {
+
                     ItemTier lowestItemTier = ItemTier.Tier3;
                     foreach(PickupPickerController.Option option in self.options)
                     {
@@ -583,6 +584,13 @@ namespace RiskOfVampire
                             lowestItemTier = ItemTier.Tier2;
                         }
                     }
+
+                    int tier1Count = inventory.GetTotalItemCountOfTier(ItemTier.Tier1)
+                        + inventory.GetTotalItemCountOfTier(ItemTier.VoidTier1);
+                    int tier2Count = inventory.GetTotalItemCountOfTier(ItemTier.Tier2)
+                        + inventory.GetTotalItemCountOfTier(ItemTier.VoidTier2);
+                    bool isTier1ReachLimit = tier1Count >= syncConfig.whiteItemUpperLimit;
+                    bool isTier2ReachLimit = tier2Count >= syncConfig.greenItemUpperLimit;
 
                     // 作成するOption list
                     HashSet<PickupPickerController.Option> list = new HashSet<PickupPickerController.Option>();
@@ -612,11 +620,6 @@ namespace RiskOfVampire
                         {
                             continue;
                         }
-                        // 追加確率の抽選
-                        if (syncConfig.possessedItemChance > UnityEngine.Random.value)
-                        {
-                            continue;
-                        }
                         // 最小がTier3の場合
                         if (lowestItemTier == ItemTier.Tier3)
                         {
@@ -627,6 +630,7 @@ namespace RiskOfVampire
                             {
                                 continue;
                             }
+                            // 確率で弾かず、全アイテム追加
                         }
                         // 最小がTier2の場合
                         if (lowestItemTier == ItemTier.Tier2)
@@ -639,20 +643,31 @@ namespace RiskOfVampire
                             {
                                 continue;
                             }
+                            // tier2がまだ埋まっていない場合、抽選で候補に追加しない
+                            // 逆にtier2が埋まっている場合は、全て追加する
+                            if (!isTier2ReachLimit && syncConfig.possessedItemChance > UnityEngine.Random.value)
+                            {
+                                continue;
+                            }
                         }
                         // 最小がTier1の場合
                         if (lowestItemTier != ItemTier.Tier1)
                         {
-
+                            // tier1がまだ埋まっていない場合、抽選で候補に追加しない
+                            // 逆にtier1が埋まっている場合は、全て追加する
+                            if (!isTier1ReachLimit && syncConfig.possessedItemChance > UnityEngine.Random.value)
+                            {
+                                continue;
+                            }
                             if (itemDef.tier == ItemTier.Tier2 || itemDef.tier == ItemTier.VoidTier2)
                             {
-                                if (UnityEngine.Random.value > 1 / 3)
+                                if (UnityEngine.Random.value > 1 / 2)
                                     continue;
                             }
                             else if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3
                                 || itemDef.tier == ItemTier.Boss || itemDef.tier == ItemTier.VoidBoss)
                             {
-                                if (UnityEngine.Random.value > 1 / 10)
+                                if (UnityEngine.Random.value > 1 / 5)
                                     continue;
                             }
                         }
@@ -671,10 +686,25 @@ namespace RiskOfVampire
                     //    list.Add(self.options[1]);
                     //}
 
-                    // 以前のoptionsを全部加える
+                    // 最初のoptionのうち、アイテム上限に引っかからないものを全部加える
                     for (var i = 0; i < self.options.Length; i++)
                     {
-                        list.Add(self.options[i]);
+                        var option = self.options[i];
+                        var itemTier = option.pickupIndex.pickupDef.itemTier;
+                        if (itemTier == ItemTier.Tier1)
+                        {
+                            if (!isTier1ReachLimit)
+                            {
+                                list.Add(self.options[i]);
+                            }
+                        }
+                        if (itemTier == ItemTier.Tier2)
+                        {
+                            if (!isTier2ReachLimit)
+                            {
+                                list.Add(self.options[i]);
+                            }
+                        }
                     }
 
                     // shuffleして先頭nつだけ残す
