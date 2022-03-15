@@ -9,14 +9,14 @@ namespace RiskOfVampire
 {
     internal class SyncConfig : INetMessage
     {
-        float possessedItemChance;
-        float ospPercent;
-        float invTime;
-        float moneyScaling;
-        float healPerSecond;
-        int itemPickerOptionAmount;
-        int whiteItemUpperLimit;
-        int greenItemUpperLimit;
+        public float possessedItemChance;
+        public float ospPercent;
+        public float invTime;
+        public float moneyScaling;
+        public float healPerSecond;
+        public int itemPickerOptionAmount;
+        public int whiteItemUpperLimit;
+        public int greenItemUpperLimit;
 
         public SyncConfig()
         {
@@ -53,13 +53,9 @@ namespace RiskOfVampire
                 return;
             }
 
-            RiskOfVampire.possessedItemChance = possessedItemChance;
-            RiskOfVampire.ospPercent = ospPercent;
-            RiskOfVampire.invTime = invTime;
-            RiskOfVampire.moneyScaling = moneyScaling;
-            RiskOfVampire.healPerSecond = healPerSecond;
-            RiskOfVampire.itemPickerOptionAmount= itemPickerOptionAmount;
-
+            // hostでない場合、RoVクラスでインスタンス化しない
+            // ここでRoVクラスからの参照を設定する
+            RiskOfVampire.syncConfig = this;
             Debug.Log("SyncConfig OnReceived");
         }
 
@@ -71,6 +67,8 @@ namespace RiskOfVampire
             writer.Write(moneyScaling);
             writer.Write(healPerSecond);
             writer.Write(itemPickerOptionAmount);
+            writer.Write(whiteItemUpperLimit);
+            writer.Write(greenItemUpperLimit);
         }
     }
 }

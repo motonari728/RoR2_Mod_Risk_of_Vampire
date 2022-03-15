@@ -54,7 +54,10 @@ namespace RiskOfVampire
         public DifficultyIndex difficulty5Index;
 
         public int ambientLevelFloor = 1;
+        internal static SyncConfig syncConfig;
 
+        // ConfigEntryはBaseUnityPluginを継承したクラスでしかBindできない
+        // そこで定義とBindはこのクラスでやる
         // config need to sync
         private static ConfigEntry<float> InvTime;
         private static ConfigEntry<float> OspPercent;
@@ -64,16 +67,6 @@ namespace RiskOfVampire
         private static ConfigEntry<int> ItemPickerOptionAmount;
         private static ConfigEntry<int> WhiteItemUpperLimit;
         private static ConfigEntry<int> GreenItemUpperLimit;
-
-        // server->client sync variable
-        public static float invTime;
-        public static float ospPercent;
-        public static float healPerSecond;
-        public static float possessedItemChance;
-        public static float moneyScaling;
-        public static int itemPickerOptionAmount;
-        public static int whiteItemUpperLimit;
-        public static int greenItemUpperLimit;
 
         // config don't need to sync
         private static ConfigEntry<float> MultiShopSpawnChance;
@@ -219,7 +212,7 @@ namespace RiskOfVampire
             On.RoR2.HealthComponent.OnInventoryChanged += (orig, self) =>
             {
                 // healPerSecondが1なら、もとの挙動のまま
-                if (healPerSecond == 1f)
+                if (syncConfig.healPerSecond == 1f)
                 {
                     orig(self);
                     return;
@@ -257,7 +250,7 @@ namespace RiskOfVampire
                 }
 
                 // healPerSecondが1のときはもとの挙動のまま
-                if (healPerSecond == 1f)
+                if (syncConfig.healPerSecond == 1f)
                 {
                     return orig(self, amount, procChainMask, nonRegen);
                 }
@@ -306,7 +299,7 @@ namespace RiskOfVampire
                     // FixedUpdateからのHealはprocChainMaskがRepeatHealになってる
                     //if (nonRegen && this.repeatHealComponent && !procChainMask.HasProc(ProcType.RepeatHeal))
                     // HealperSecond
-                    self.repeatHealComponent.healthFractionToRestorePerSecond = healPerSecond / (1f + (float)self.itemCounts.repeatHeal);
+                    self.repeatHealComponent.healthFractionToRestorePerSecond = syncConfig.healPerSecond / (1f + (float)self.itemCounts.repeatHeal);
                     self.repeatHealComponent.AddReserve(amount * (float)(1 + self.itemCounts.repeatHeal), self.fullHealth * 2f);
                     return 0f;
                 }
@@ -351,12 +344,12 @@ namespace RiskOfVampire
             };
         }
 
-        private static void HookMoneyScaling()
+        private void HookMoneyScaling()
         {
             On.RoR2.Run.GetDifficultyScaledCost_int_float += (orig, self, baseCost, difficultyCoefficient) =>
             {
                 //return (int)((float)baseCost * Mathf.Pow(difficultyCoefficient, 1.25f));
-                return (int)((float)baseCost * Mathf.Pow(difficultyCoefficient, moneyScaling));
+                return (int)((float)baseCost * Mathf.Pow(difficultyCoefficient, syncConfig.moneyScaling));
             };
         }
 
@@ -395,8 +388,13 @@ namespace RiskOfVampire
 
             HealMultiply = Config.Bind("Stats", "Healing amount modify", 0.5f,
                 new ConfigDescription("Multiply the amount of healing. If you enter 0.6, amount of all heal excluding regen will be 60%. Only valid for additional difficulty"));
+
             ItemPickerOptionAmount = Config.Bind("Item", "Option amount of ItemPicker", 3,
                 new ConfigDescription("How many candidates are displayed when opeingItemPicker orb spawned from chests."));
+            WhiteItemUpperLimit = Config.Bind("Item", "White item upper limit", 7,
+                new ConfigDescription("You can't get new kind of white items when reach this limit. Like Vampire Survivors. You can only get the type of white items you already have."));
+            GreenItemUpperLimit = Config.Bind("Item", "Green item upper limit", 4,
+                new ConfigDescription("You can't get new kind of green items when reach this limit. Like Vampire Survivors. You can only get the type of green items you already have."));
 
             ReloadConfig();
         }
@@ -404,17 +402,14 @@ namespace RiskOfVampire
         private void ReloadConfig()
         {
             // ここはソロプレイでも呼ばれるので気をつける
-            invTime = InvTime.Value;
-            ospPercent = OspPercent.Value;
-            healPerSecond = HealPerSecond.Value;
-            possessedItemChance = PossessedItemChance.Value;
-            moneyScaling = MoneyScaling.Value;
-            itemPickerOptionAmount = ItemPickerOptionAmount.Value;
 
             // Clientに送信
             if (NetworkServer.active)
             {
-                new SyncConfig(possessedItemChance, ospPercent, invTime, moneyScaling, healPerSecond, itemPickerOptionAmount).Send(NetworkDestination.Clients);
+                // hostなら自分でインスタンス化する
+                // hostでないならSyncConfig.OnReceivedでRoVクラスからの参照を設定する
+                syncConfig = new SyncConfig(PossessedItemChance.Value, OspPercent.Value, InvTime.Value, MoneyScaling.Value, HealPerSecond.Value, ItemPickerOptionAmount.Value, WhiteItemUpperLimit.Value, GreenItemUpperLimit.Value); 
+                syncConfig.Send(NetworkDestination.Clients);
             }
         }
 
@@ -428,7 +423,7 @@ namespace RiskOfVampire
                     return;
                 }
                 orig(self);
-                self.ospTimer = invTime;
+                self.ospTimer = syncConfig.invTime;
                 Logger.LogInfo(self.ospTimer);
             };
 
@@ -443,7 +438,7 @@ namespace RiskOfVampire
                 // もっと高い値に設定し直す
                 // 1 - 0.9 = 0.1
                 // 1 - 0.4 = 0.6
-                float newOspFraction = 1f - ospPercent;
+                float newOspFraction = 1f - syncConfig.ospPercent;
                 // もとがif(NetworkServer.active)の外側なので、ifいらない
                 self.oneShotProtectionFraction = Mathf.Max(0f, newOspFraction - (1f - 1f / self.cursePenalty));
             };
@@ -618,7 +613,7 @@ namespace RiskOfVampire
                             continue;
                         }
                         // 追加確率の抽選
-                        if (possessedItemChance > UnityEngine.Random.value)
+                        if (syncConfig.possessedItemChance > UnityEngine.Random.value)
                         {
                             continue;
                         }
@@ -684,7 +679,7 @@ namespace RiskOfVampire
 
                     // shuffleして先頭nつだけ残す
                     PickupPickerController.Option[] rolledList = list.ToList().OrderBy(x => UnityEngine.Random.value)
-                        .Take(itemPickerOptionAmount).ToArray();
+                        .Take(syncConfig.itemPickerOptionAmount).ToArray();
 
                     //Logger.LogInfo(rolledList);
                     self.SetOptionsServer(rolledList);
