@@ -67,7 +67,7 @@ It's easy because you can choose the item. So I added 3 more difficult difficult
 - Scaling the amount of money needed to open the box has increased significantly from 1.25 to 1.45
 
 ### Multiplay
-It is available. In multiplayer, we are developing with the assumption that everyone will include this mod. Please install this mod with clients.
+It is available. In multiplayer, we are developing with the assumption that everyone will include this mod. Please install this mod in host and clients.
 We have confirmed that people with this mod can multiplay without any problems. 
 
 ---------------------------------------
