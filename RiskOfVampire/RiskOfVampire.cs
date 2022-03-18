@@ -573,7 +573,7 @@ namespace RiskOfVampire
             HealPerSecond = Config.Bind("Stats", "Max Heal per second", 1f,
                 new ConfigDescription("Max Heal per second. Store overflow to next seconds. Store limit is 200% HP. Enter 1.0 to return to the original behavior."));
 
-            ObjectSumMultiply = Config.Bind("Spawn", "Map Object Spawn Amount", 1f,
+            ObjectSumMultiply = Config.Bind("Spawn", "Map Object Spawn Amount", 0.8f,
                 new ConfigDescription("Multiply the total of all map objects by this. 1 is Original amount. 2 is *2 amount."));
             MultiShopSpawnChance = Config.Bind("Spawn", "MultiShop spawn chance", 0.0f,
                 new ConfigDescription("Multiply the spawn weight of MultiShop. 0 is None. 1 is Original weight"));
@@ -584,16 +584,16 @@ namespace RiskOfVampire
             ChanceShrineSpawnChance = Config.Bind("Spawn", "LuckShrine spawn chance", 0.0f,
                 new ConfigDescription("Multiply the spawn weight of LuckShrine. 0 is None. 1 is Original weight"));
 
-            HealMultiply = Config.Bind("Stats", "Healing amount modify", 0.5f,
+            HealMultiply = Config.Bind("Stats", "Healing amount modify", 1f,
                 new ConfigDescription("Multiply the amount of healing. If you enter 0.6, amount of all heal excluding regen will be 60%. Only valid for additional difficulty"));
 
             ItemPickerOptionAmount = Config.Bind("Item", "Option amount of ItemPicker", 2,
                 new ConfigDescription("How many candidates are displayed when opeingItemPicker orb spawned from chests."));
-            RandomItemAddPoolCount = Config.Bind("Item", "Random item amount add to Lottery pool", 2,
+            RandomItemAddPoolCount = Config.Bind("Item", "Random item amount add to Lottery pool", 1,
                 new ConfigDescription("How many random items are added to Lottery pool. Between 1.0~5.0"));
-            WhiteItemUpperLimit = Config.Bind("Item", "White item upper limit", 6,
+            WhiteItemUpperLimit = Config.Bind("Item", "White item upper limit", 5,
                 new ConfigDescription("You can't get new kind of white items when reach this limit. Like Vampire Survivors. You can only get the type of white items you already have."));
-            GreenItemUpperLimit = Config.Bind("Item", "Green item upper limit", 4,
+            GreenItemUpperLimit = Config.Bind("Item", "Green item upper limit", 3,
                 new ConfigDescription("You can't get new kind of green items when reach this limit. Like Vampire Survivors. You can only get the type of green items you already have."));
 
             ReloadConfig();
@@ -849,7 +849,7 @@ namespace RiskOfVampire
                             if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3
                                 || itemDef.tier == ItemTier.Boss || itemDef.tier == ItemTier.VoidBoss)
                             {
-                                if (UnityEngine.Random.value > 1f / 8f)
+                                if (UnityEngine.Random.value > 1f / 10f)
                                     continue;
                             }
                         }
@@ -864,7 +864,7 @@ namespace RiskOfVampire
                             }
                             if (itemDef.tier == ItemTier.Tier2 || itemDef.tier == ItemTier.VoidTier2)
                             {
-                                if (UnityEngine.Random.value > 1f / 4f)
+                                if (UnityEngine.Random.value > 1f / 5f)
                                     continue;
                             }
                             else if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3
