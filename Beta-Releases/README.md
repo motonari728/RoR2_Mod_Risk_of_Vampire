@@ -1,6 +1,9 @@
 # Risk Of Vampire
 
+This is Beta version for testers. Please use [main version](https://thunderstore.io/package/mochi/Risk_of_Vampire/).
+
 This is mod for Risk of Rain2([Steam](https://store.steampowered.com/app/632360/Risk_of_Rain_2/))
+
 
 日本語は英語のあとに続きます。(See below for the Japanese version.)
 

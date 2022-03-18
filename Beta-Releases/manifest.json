@@ -1,0 +1,10 @@
+﻿{
+	"name": "Risk_of_Vampire_Beta",
+	"version_number": "2.0.0",
+	"website_url": "https://github.com/motonari728/RoR2_Mod_Risk_of_Vampire",
+	"description": "Beta version for testers.",
+	"dependencies": [
+		"bbepis-BepInExPack-5.4.19",
+		"tristanmcpherson-R2API-4.0.11"
+	]
+}

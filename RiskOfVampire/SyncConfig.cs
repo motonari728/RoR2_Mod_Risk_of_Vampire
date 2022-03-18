@@ -15,14 +15,16 @@ namespace RiskOfVampire
         public float moneyScaling;
         public float healPerSecond;
         public int itemPickerOptionAmount;
+        public int randomItemAddPoolCount;
         public int whiteItemUpperLimit;
         public int greenItemUpperLimit;
+
 
         public SyncConfig()
         {
         }
 
-        public SyncConfig(float possessedItemChance, float ospPercent, float invTime, float moneyScaling, float healPerSecond, int itemPickerOptionAmount, int whiteItemUpperLimit, int greenItemUpperLimit)
+        public SyncConfig(float possessedItemChance, float ospPercent, float invTime, float moneyScaling, float healPerSecond, int itemPickerOptionAmount, int whiteItemUpperLimit, int greenItemUpperLimit, int randomItemAddPool)
         {
             this.possessedItemChance = possessedItemChance;
             this.ospPercent = ospPercent;
@@ -32,6 +34,7 @@ namespace RiskOfVampire
             this.itemPickerOptionAmount = itemPickerOptionAmount;
             this.whiteItemUpperLimit = whiteItemUpperLimit;
             this.greenItemUpperLimit = greenItemUpperLimit;
+            this.randomItemAddPoolCount = randomItemAddPool;
         }
 
         public void Deserialize(NetworkReader reader)
@@ -44,6 +47,7 @@ namespace RiskOfVampire
             itemPickerOptionAmount = reader.ReadInt32();
             whiteItemUpperLimit = reader.ReadInt32();
             greenItemUpperLimit = reader.ReadInt32();
+            randomItemAddPoolCount = reader.ReadInt32();
         }
 
         public void OnReceived()
@@ -69,6 +73,7 @@ namespace RiskOfVampire
             writer.Write(itemPickerOptionAmount);
             writer.Write(whiteItemUpperLimit);
             writer.Write(greenItemUpperLimit);
+            writer.Write(randomItemAddPoolCount);
         }
     }
 }
