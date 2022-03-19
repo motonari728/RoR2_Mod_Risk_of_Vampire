@@ -115,7 +115,182 @@ namespace RiskOfVampire
             Hook_HPDefine();
             Hook_Spawns();
             Hook_forItemCountChat();
+            Hook_forItemSelect();
+            Hook_ShrineDrop();
+            Hook_BossDrop();
 
+            //Log.LogInfo(nameof(Awake) + " done.");
+        }
+
+        private static void Hook_BossDrop()
+        {
+            On.RoR2.BossGroup.DropRewards += (orig, self) =>
+            {
+                int participatingPlayerCount = Run.instance.participatingPlayerCount;
+                if (participatingPlayerCount != 0 && self.dropPosition)
+                {
+                    PickupIndex pickupIndex = PickupIndex.none;
+                    if (self.dropTable)
+                    {
+                        pickupIndex = self.dropTable.GenerateDrop(self.rng);
+                    }
+                    else
+                    {
+                        List<PickupIndex> list = Run.instance.availableTier2DropList;
+                        if (self.forceTier3Reward)
+                        {
+                            list = Run.instance.availableTier3DropList;
+                        }
+                        pickupIndex = self.rng.NextElementUniform<PickupIndex>(list);
+                    }
+                    int num = 1 + self.bonusRewardCount;
+                    if (self.scaleRewardsByPlayerCount)
+                    {
+                        num *= participatingPlayerCount;
+                    }
+                    float angle = 360f / (float)num;
+                    Vector3 vector = Quaternion.AngleAxis((float)UnityEngine.Random.Range(0, 360), Vector3.up) * (Vector3.up * 40f + Vector3.forward * 5f);
+                    Quaternion rotation = Quaternion.AngleAxis(angle, Vector3.up);
+                    int i = 0;
+                    while (i < num)
+                    {
+                        PickupIndex pickupIndex2 = pickupIndex;
+                        // ボスドロップだったらpickupIndex2を書き換える
+                        if ((self.bossDrops.Count > 0 || self.bossDropTables.Count > 0) && self.rng.nextNormalizedFloat <= self.bossDropChance)
+                        {
+                            if (self.bossDropTables.Count > 0)
+                            {
+                                pickupIndex2 = self.rng.NextElementUniform<PickupDropTable>(self.bossDropTables).GenerateDrop(self.rng);
+                            }
+                            else
+                            {
+                                pickupIndex2 = self.rng.NextElementUniform<PickupIndex>(self.bossDrops);
+                            }
+                        }
+                        // 緑アイテムだったら
+                        if (pickupIndex2.pickupDef.itemTier != ItemTier.Boss
+                            && pickupIndex2.pickupDef.itemTier != ItemTier.VoidBoss)
+                        {
+                            var options = PickupPickerController.GenerateOptionsFromDropTable(5, self.dropTable, self.rng);
+                            PickupDropletController.CreatePickupDroplet(new GenericPickupController.CreatePickupInfo
+                            {
+                                pickupIndex = PickupCatalog.FindPickupIndex(ItemTier.Tier2),
+                                pickerOptions = options,
+                                //pickerOptions = PickupPickerController.SetOptionsFromInteractor(),
+                                rotation = Quaternion.identity,
+                                prefabOverride = OptionPickup
+                            }, self.dropPosition.position, vector);
+                        }
+                        // ボスアイテムだったら元のまま
+                        else
+                        {
+                            PickupDropletController.CreatePickupDroplet(pickupIndex2, self.dropPosition.position, vector);
+                        }
+                        i++;
+                        vector = rotation * vector;
+                    }
+                }
+            };
+        }
+
+        private void Hook_ShrineDrop()
+        {
+            On.RoR2.ShrineChanceBehavior.AddShrineStack += (orig, self, activator) =>
+            {
+                if (!NetworkServer.active)
+                {
+                    Debug.LogWarning("[Server] function 'System.Void RoR2.ShrineChanceBehavior::AddShrineStack(RoR2.Interactor)' called on client");
+                    return;
+                }
+                PickupIndex pickupIndex = PickupIndex.none;
+                if (self.dropTable)
+                {
+                    if (self.rng.nextNormalizedFloat > self.failureChance)
+                    {
+                        pickupIndex = self.dropTable.GenerateDrop(self.rng);
+                    }
+                }
+                else
+                {
+                    PickupIndex none = PickupIndex.none;
+                    PickupIndex value = self.rng.NextElementUniform<PickupIndex>(Run.instance.availableTier1DropList);
+                    PickupIndex value2 = self.rng.NextElementUniform<PickupIndex>(Run.instance.availableTier2DropList);
+                    PickupIndex value3 = self.rng.NextElementUniform<PickupIndex>(Run.instance.availableTier3DropList);
+                    PickupIndex value4 = self.rng.NextElementUniform<PickupIndex>(Run.instance.availableEquipmentDropList);
+                    WeightedSelection<PickupIndex> weightedSelection = new WeightedSelection<PickupIndex>(8);
+                    weightedSelection.AddChoice(none, self.failureWeight);
+                    weightedSelection.AddChoice(value, self.tier1Weight);
+                    weightedSelection.AddChoice(value2, self.tier2Weight);
+                    weightedSelection.AddChoice(value3, self.tier3Weight);
+                    weightedSelection.AddChoice(value4, self.equipmentWeight);
+                    pickupIndex = weightedSelection.Evaluate(self.rng.nextNormalizedFloat);
+                }
+                bool flag = pickupIndex == PickupIndex.none;
+                string baseToken;
+                // 失敗時
+                if (flag)
+                {
+                    baseToken = "SHRINE_CHANCE_FAIL_MESSAGE";
+                }
+                else
+                {
+                    baseToken = "SHRINE_CHANCE_SUCCESS_MESSAGE";
+                    self.successfulPurchaseCount++;
+
+                    // アイテムだったら
+                    if (pickupIndex.pickupDef.equipmentIndex == EquipmentIndex.None)
+                    {
+                        // Tier1,2,3のみ。デフォルト確率
+                        var myDropTable = ScriptableObject.CreateInstance<BasicPickupDropTable>();
+                        myDropTable.Regenerate(Run.instance);
+                        PickupPickerController.Option[] pickerOptions = PickupPickerController.GenerateOptionsFromDropTable(5, myDropTable, self.rng);
+                        ItemTier lowestItemTier = ItemTier.Tier1;
+
+                        PickupDropletController.CreatePickupDroplet(new GenericPickupController.CreatePickupInfo
+                        {
+                            pickupIndex = PickupCatalog.FindPickupIndex(lowestItemTier),
+                            pickerOptions = pickerOptions,
+                            //pickerOptions = PickupPickerController.SetOptionsFromInteractor(),
+                            rotation = Quaternion.identity,
+                            prefabOverride = OptionPickup
+                        }, self.dropletOrigin.position, self.dropletOrigin.forward * 20f);
+                    }
+                    else
+                    {
+                        PickupDropletController.CreatePickupDroplet(pickupIndex, self.dropletOrigin.position, self.dropletOrigin.forward * 20f);
+                    }
+
+                }
+                Chat.SendBroadcastChat(new Chat.SubjectFormatChatMessage
+                {
+                    subjectAsCharacterBody = activator.GetComponent<CharacterBody>(),
+                    baseToken = baseToken
+                });
+                // ここはShrineChanceBehaviorの中でしか実行できない
+                // 連続失敗のアチーブメントで使われているだけなので良し
+                //Action<bool, Interactor> action = ShrineChanceBehavior.onShrineChancePurchaseGlobal;
+                //if (action != null)
+                //{
+                //    action(flag, activator);
+                //}
+                self.waitingForRefresh = true;
+                self.refreshTimer = 2f;
+                EffectManager.SpawnEffect(LegacyResourcesAPI.Load<GameObject>("Prefabs/Effects/ShrineUseEffect"), new EffectData
+                {
+                    origin = base.transform.position,
+                    rotation = Quaternion.identity,
+                    scale = 1f,
+                    color = self.shrineColor
+                }, true);
+                if (self.successfulPurchaseCount >= self.maxPurchaseCount)
+                {
+                    self.symbolTransform.gameObject.SetActive(false);
+                }
+            };
+        }
+
+        private void Hook_forItemSelect()
+        {
             On.RoR2.PickupPickerController.CreatePickup_PickupIndex += (orig, self, pickupIndex) =>
             {
                 if (!NetworkServer.active)
@@ -142,9 +317,6 @@ namespace RiskOfVampire
                     inventory.GiveItem(pickupIndex.pickupDef.itemIndex, 1);
                 }
             };
-
-
-            //Log.LogInfo(nameof(Awake) + " done.");
         }
 
         // 最初のフレームの実行直前
@@ -581,7 +753,7 @@ namespace RiskOfVampire
                 new ConfigDescription("Multiply the spawn weight of Scrapper. 0 is None. 1 is Original weight"));
             PrinterSpawnChance = Config.Bind("Spawn", "3D Printer spawn chance", 0.0f,
                 new ConfigDescription("Multiply the spawn weight of 3D Printer. 0 is None. 1 is Original weight"));
-            ChanceShrineSpawnChance = Config.Bind("Spawn", "LuckShrine spawn chance", 0.0f,
+            ChanceShrineSpawnChance = Config.Bind("Spawn", "LuckShrine spawn chance", 0.5f,
                 new ConfigDescription("Multiply the spawn weight of LuckShrine. 0 is None. 1 is Original weight"));
 
             HealMultiply = Config.Bind("Stats", "Healing amount modify", 1f,
@@ -900,6 +1072,8 @@ namespace RiskOfVampire
                     // 候補は少なくとも4を確保する
                     if (list.Count + addItemCount < 4)
                         addItemCount = 4 - list.Count;
+                    // self.optionsの数以上を追加しないように
+                    addItemCount = Math.Min(addItemCount, self.options.Length);
                     for (var i = 0; i < addItemCount; i++)
                     {
                         var option = self.options[i];

@@ -133,6 +133,9 @@ Vampire Survivorsを参考にアイテムの枠上限が導入されました。
 Modが入った人同士で問題なく動くことを確認しています。
 
 ## Changelog
+**2.0.2**
+- Boss drops and luck shrine drops are converted to void potentials(item picker).
+
 **2.0.0**
 - Limited item slot system is introduced.
 
