@@ -35,24 +35,16 @@ namespace RiskOfVampire
         public const string PluginName = "RiskOfVampire";
         public const string PluginVersion = "2.0.0";
 
-        //protected ConfigFile Config { get; }
-
-        //We need our item definition to persist through our functions, and therefore make it a class field.
-        //private static ItemDef myItemDef;
-
-        //public GameObject pickupMystery;
-        //public GameObject[] pickupModels;
-
         public static GameObject OptionPickup;
         public static Sprite MonsoonIcon;
         public static GameObject ChatPrefab;
 
-        public DifficultyDef difficulty4Def;
-        public DifficultyIndex difficulty4Index;
-        public DifficultyDef difficulty45Def;
-        public DifficultyIndex difficulty45Index;
-        public DifficultyDef difficulty5Def;
-        public DifficultyIndex difficulty5Index;
+        public static DifficultyDef difficulty4Def;
+        public static DifficultyIndex difficulty4Index;
+        public static DifficultyDef difficulty45Def;
+        public static DifficultyIndex difficulty45Index;
+        public static DifficultyDef difficulty5Def;
+        public static DifficultyIndex difficulty5Index;
 
         internal static SyncConfig syncConfig;
 
@@ -63,12 +55,10 @@ namespace RiskOfVampire
 
         // こいつらはRunごとにリセットが必要
         public int ambientLevelFloor = 1;
-        public int tier1Count = 0;
-        public int tier1CountPrev = 0;
-        public int tier2Count = 0;
-        public int tier2CountPrev = 0;
-        public bool isTier1ReachLimit = false;
-        public bool isTier2ReachLimit = false;
+        //public int tier1Count = 0;
+        //public int tier1CountPrev = 0;
+        //public int tier2Count = 0;
+        //public int tier2CountPrev = 0;
 
         // ConfigEntryはBaseUnityPluginを継承したクラスでしかBindできない
         // そこで定義とBindはこのクラスでやる
@@ -348,7 +338,7 @@ namespace RiskOfVampire
                                     if (self == NetworkUser.localPlayers[0].master.inventory)
                                     {
                                         // OnInventoryChangedからは、isChangedの場合のみ
-                                        ShowItemCount(self, true);
+                                        ShowItemCount(self);
                                     }
             };
             On.RoR2.UI.ChatBox.UpdateFade += (orig, self, deltaTime) =>
@@ -359,17 +349,13 @@ namespace RiskOfVampire
             };
         }
 
-        private void ShowItemCount(Inventory inventory, bool force)
+        private void ShowItemCount(Inventory inventory)
         {
-            // forceなら強制表示
-            bool isChanged = ItemRecount(inventory);
-            if (isChanged || force)
-            {
-                SendItemCountMessage();
-            }
+            int[] counts = ItemRecount(inventory);
+            SendItemCountMessage(counts[0], counts[1]);
         }
 
-        private void SendItemCountMessage()
+        private void SendItemCountMessage(int tier1Count, int tier2Count)
         {
             int tier1Limit = syncConfig.whiteItemUpperLimit;
             int tier2Limit = syncConfig.greenItemUpperLimit;
@@ -380,15 +366,15 @@ namespace RiskOfVampire
             });
         }
 
-        private bool ItemRecount(Inventory inventory)
+        private int[] ItemRecount(Inventory inventory)
 
         {
             //tier1Count = inventory.GetTotalItemCountOfTier(ItemTier.Tier1)
             //+ inventory.GetTotalItemCountOfTier(ItemTier.VoidTier1);
             //tier2Count = inventory.GetTotalItemCountOfTier(ItemTier.Tier2)
             //+ inventory.GetTotalItemCountOfTier(ItemTier.VoidTier2);
-            tier1Count = 0;
-            tier2Count = 0;
+            int tier1Count = 0;
+            int tier2Count = 0;
             for (int i = 0; i < inventory.itemAcquisitionOrder.Count; i++)
             {
                 ItemIndex itemIndex = inventory.itemAcquisitionOrder[i];
@@ -415,16 +401,7 @@ namespace RiskOfVampire
                     tier2Count += 1;
             }
 
-            bool isChanged = false;
-            // 前回と変わっていたら
-            if (tier1Count != tier1CountPrev || tier2Count != tier2CountPrev)
-                isChanged = true;
-            tier1CountPrev = tier1Count;
-            tier2CountPrev = tier2Count;
-
-            isTier1ReachLimit = tier1Count >= syncConfig.whiteItemUpperLimit;
-            isTier2ReachLimit = tier2Count >= syncConfig.greenItemUpperLimit;
-            return isChanged;
+            return new int[]{ tier1Count, tier2Count };
         }
 
         private void Hook_RunStart()
@@ -445,12 +422,6 @@ namespace RiskOfVampire
                 //chatbox.fadeTimer = 60f * 60f * 24f;
                 // こいつらはRunごとにリセットが必要
                 ambientLevelFloor = 1;
-                tier1Count = 0;
-                tier1CountPrev = 0;
-                tier2Count = 0;
-                tier2CountPrev = 0;
-                isTier1ReachLimit = false;
-                isTier2ReachLimit = false;
 
                 orig(self);
             };
@@ -459,7 +430,7 @@ namespace RiskOfVampire
         IEnumerator ShowItemCountOnRunStart(float s)
         {
             yield return new WaitForSeconds(s);
-            SendItemCountMessage();
+            SendItemCountMessage(0, 0);
         }
 
         private void Hook_Spawns()
@@ -908,38 +879,14 @@ namespace RiskOfVampire
             };
         }
 
-        private bool[] ItemRecountServer(Inventory inventory)
+        private bool[] IsReachLimits(Inventory inventory)
         {
-            tier1Count = 0;
-            tier2Count = 0;
-            for (int i = 0; i < inventory.itemAcquisitionOrder.Count; i++)
-            {
-                ItemIndex itemIndex = inventory.itemAcquisitionOrder[i];
-                ItemDef itemDef = ItemCatalog.GetItemDef(itemIndex);
-                if (!itemDef)
-                    continue;
-                // スクラップアイテムの除去
-                if (itemDef.ContainsTag(ItemTag.Scrap))
-                    continue;
-                if (!itemDef.canRemove || itemDef.hidden)
-                    continue;
-                // 使用済みアイテムはNoTier
-                if (itemDef.tier == ItemTier.NoTier || itemDef.tier == ItemTier.Lunar)
-                    continue;
-                // bossアイテムは追加しない
-                if (itemDef.tier == ItemTier.Boss || itemDef.tier == ItemTier.VoidBoss)
-                    continue;
-                // Tier1とTier2のアイテムを数える
-                // ここでは種類を数えれば良いので、個数はいらない
-                //int num = inventory.GetItemCount(itemIndex);
-                if (itemDef.tier == ItemTier.Tier1 || itemDef.tier == ItemTier.VoidTier1)
-                    tier1Count += 1;
-                if (itemDef.tier == ItemTier.Tier2 || itemDef.tier == ItemTier.VoidTier2)
-                    tier2Count += 1;
-            }
+            int[] counts = ItemRecount(inventory);
+            int tier1Count = counts[0];
+            int tier2Count = counts[1];
 
-            isTier1ReachLimit = tier1Count >= syncConfig.whiteItemUpperLimit;
-            isTier2ReachLimit = tier2Count >= syncConfig.greenItemUpperLimit;
+            bool isTier1ReachLimit = tier1Count >= syncConfig.whiteItemUpperLimit;
+            bool isTier2ReachLimit = tier2Count >= syncConfig.greenItemUpperLimit;
 
             return new bool[] { isTier1ReachLimit, isTier2ReachLimit };
         }
@@ -988,7 +935,7 @@ namespace RiskOfVampire
                 PickupIndex whiteScrapIndex = PickupCatalog.FindPickupIndex(scrapWhite.itemIndex);
                 PickupIndex greenScrapIndex = PickupCatalog.FindPickupIndex(scrapGreen.itemIndex);
                 // 上限設定のため、Itemcountを更新する
-                var isLimits = ItemRecountServer(inventory);
+                var isLimits = IsReachLimits(inventory);
                 bool isTier1ReachLimit = isLimits[0];
                 bool isTier2ReachLimit = isLimits[1];
                 
@@ -1266,29 +1213,29 @@ namespace RiskOfVampire
             // difficultyDefs[2]がmonsoon
             // DnSpyではreadonlyだが書き換えできる
 
-            this.difficulty4Def = new(4f, "DestinyDifficulty_4_NAME", "Step13", "DestinyDifficulty_4_DESCRIPTION",
+            difficulty4Def = new(4f, "DestinyDifficulty_4_NAME", "Step13", "DestinyDifficulty_4_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
-            this.difficulty4Def.foundIconSprite = true;
-            this.difficulty4Def.iconSprite = MonsoonIcon;
-            this.difficulty4Index = DifficultyAPI.AddDifficulty(this.difficulty4Def);
-            LanguageAPI.Add(this.difficulty4Def.nameToken, "Destiny");
-            LanguageAPI.Add(this.difficulty4Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+100%</style></style>");
+            difficulty4Def.foundIconSprite = true;
+            difficulty4Def.iconSprite = MonsoonIcon;
+            difficulty4Index = DifficultyAPI.AddDifficulty(difficulty4Def);
+            LanguageAPI.Add(difficulty4Def.nameToken, "Destiny");
+            LanguageAPI.Add(difficulty4Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+100%</style></style>");
 
-            this.difficulty45Def = new(4.5f, "DestinyDifficulty_45_NAME", "Step13", "DestinyDifficulty_45_DESCRIPTION",
+            difficulty45Def = new(4.5f, "DestinyDifficulty_45_NAME", "Step13", "DestinyDifficulty_45_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
-            this.difficulty45Def.foundIconSprite = true;
-            this.difficulty45Def.iconSprite = MonsoonIcon;
-            this.difficulty45Index = DifficultyAPI.AddDifficulty(this.difficulty45Def);
-            LanguageAPI.Add(this.difficulty45Def.nameToken, "Destiny");
-            LanguageAPI.Add(this.difficulty45Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+125%</style></style>");
+            difficulty45Def.foundIconSprite = true;
+            difficulty45Def.iconSprite = MonsoonIcon;
+            difficulty45Index = DifficultyAPI.AddDifficulty(difficulty45Def);
+            LanguageAPI.Add(difficulty45Def.nameToken, "Destiny");
+            LanguageAPI.Add(difficulty45Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+125%</style></style>");
 
-            this.difficulty5Def = new(5f, "DestinyDifficulty_5_NAME", "Step13", "DestinyDifficulty_5_DESCRIPTION",
+            difficulty5Def = new(5f, "DestinyDifficulty_5_NAME", "Step13", "DestinyDifficulty_5_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
-            this.difficulty5Def.foundIconSprite = true;
-            this.difficulty5Def.iconSprite = MonsoonIcon;
-            this.difficulty5Index = DifficultyAPI.AddDifficulty(this.difficulty5Def);
-            LanguageAPI.Add(this.difficulty5Def.nameToken, "Destiny");
-            LanguageAPI.Add(this.difficulty5Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+150%</style></style>");
+            difficulty5Def.foundIconSprite = true;
+            difficulty5Def.iconSprite = MonsoonIcon;
+            difficulty5Index = DifficultyAPI.AddDifficulty(difficulty5Def);
+            LanguageAPI.Add(difficulty5Def.nameToken, "Destiny");
+            LanguageAPI.Add(difficulty5Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+150%</style></style>");
 
             //Logger.LogInfo(DifficultyCatalog.difficultyDefs);
         }
