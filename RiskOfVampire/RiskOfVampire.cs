@@ -158,6 +158,7 @@ namespace RiskOfVampire
                             }
                         }
                         // 緑アイテムだったら
+                        // 4ステージ目でTier3ボスドロップはあるので除外する
                         if (pickupIndex2.pickupDef.itemTier != ItemTier.Boss
                             && pickupIndex2.pickupDef.itemTier != ItemTier.VoidBoss
                             && pickupIndex2.pickupDef.itemTier != ItemTier.Tier3)
@@ -231,11 +232,28 @@ namespace RiskOfVampire
                     // アイテムだったら
                     if (pickupIndex.pickupDef.equipmentIndex == EquipmentIndex.None)
                     {
-                        // Tier1,2,3のみ。デフォルト確率
                         var myDropTable = ScriptableObject.CreateInstance<BasicPickupDropTable>();
                         myDropTable.Regenerate(Run.instance);
+                        BasicPickupDropTable basicDropTable = myDropTable as BasicPickupDropTable;
                         PickupPickerController.Option[] pickerOptions = PickupPickerController.GenerateOptionsFromDropTable(5, myDropTable, self.rng);
-                        ItemTier lowestItemTier = ItemTier.Tier1;
+                        if (basicDropTable != null)
+                        {
+                            basicDropTable.selector.Clear();
+                            if (pickupIndex.pickupDef.itemTier == ItemTier.Tier1)
+                            {
+                                basicDropTable.Add(Run.instance.availableTier1DropList, 1f);
+                            }
+                            else if (pickupIndex.pickupDef.itemTier == ItemTier.Tier2)
+                            {
+                                basicDropTable.Add(Run.instance.availableTier2DropList, 1f);
+                            }
+                            else if (pickupIndex.pickupDef.itemTier == ItemTier.Tier3)
+                            {
+                                basicDropTable.Add(Run.instance.availableTier3DropList, 1f);
+                            }
+                            pickerOptions = PickupPickerController.GenerateOptionsFromDropTable(5, basicDropTable, self.rng);
+                        }
+                        ItemTier lowestItemTier = pickerOptions[0].pickupIndex.pickupDef.itemTier;
 
                         PickupDropletController.CreatePickupDroplet(new GenericPickupController.CreatePickupInfo
                         {
@@ -336,10 +354,12 @@ namespace RiskOfVampire
                             if (NetworkUser.localPlayers[0].master != null)
                                 if (NetworkUser.localPlayers[0].master.inventory != null)
                                     if (self == NetworkUser.localPlayers[0].master.inventory)
-                                    {
-                                        // OnInventoryChangedからは、isChangedの場合のみ
-                                        ShowItemCount(self);
-                                    }
+                                        if (self.gameObject != null)
+                                            if (self.gameObject.GetComponent<PlayerCharacterMasterController>() != null)
+                                                {
+                                                    // OnInventoryChangedからは、isChangedの場合のみ
+                                                    ShowItemCount(self);
+                                                }
             };
             On.RoR2.UI.ChatBox.UpdateFade += (orig, self, deltaTime) =>
             {
@@ -720,7 +740,7 @@ namespace RiskOfVampire
             HealPerSecond = Config.Bind("Stats", "Max Heal per second", 1f,
                 new ConfigDescription("Max Heal per second. Store overflow to next seconds. Store limit is 200% HP. Enter 1.0 to return to the original behavior."));
 
-            ObjectSumMultiply = Config.Bind("Spawn", "Map Object Spawn Amount", 0.8f,
+            ObjectSumMultiply = Config.Bind("Spawn", "Map Object Spawn Amount", 1f,
                 new ConfigDescription("Multiply the total of all map objects by this. 1 is Original amount. 2 is *2 amount."));
             MultiShopSpawnChance = Config.Bind("Spawn", "MultiShop spawn chance", 0.0f,
                 new ConfigDescription("Multiply the spawn weight of MultiShop. 0 is None. 1 is Original weight"));
@@ -731,7 +751,7 @@ namespace RiskOfVampire
             ChanceShrineSpawnChance = Config.Bind("Spawn", "LuckShrine spawn chance", 0.5f,
                 new ConfigDescription("Multiply the spawn weight of LuckShrine. 0 is None. 1 is Original weight"));
 
-            HealMultiply = Config.Bind("Stats", "Healing amount modify", 1f,
+            HealMultiply = Config.Bind("Stats", "Healing amount modify", 0.6f,
                 new ConfigDescription("Multiply the amount of healing. If you enter 0.6, amount of all heal excluding regen will be 60%. Only valid for additional difficulty"));
 
             ItemPickerOptionAmount = Config.Bind("Item", "Option amount of ItemPicker", 2,
@@ -846,43 +866,80 @@ namespace RiskOfVampire
                 for (int i = 0; i < self.dropCount; i++)
                 {
                     // dropTableからの最初の候補の生成
-                    List<PickupPickerController.Option> pickerOptions = PickupPickerController.GenerateOptionsFromDropTable(1, self.dropTable, self.rng).ToList();
-                    // 2つ目以降の抽選テーブル
+                    //PickupPickerController.Option firstOption = PickupPickerController.GenerateOptionsFromDropTable(1, self.dropTable, self.rng)[0];
+                    ItemTier firstTier = self.dropPickup.pickupDef.itemTier;
+                    Run run = Run.instance;
+                    // 最初がTier1だったらTier1のみから抽選
+                    ItemTier lowestItemTier = firstTier;
                     BasicPickupDropTable newDropTable = ScriptableObject.CreateInstance<BasicPickupDropTable>();
                     newDropTable.selector.Clear();
-                    Run run = Run.instance;
-                    ItemTier firstTier = pickerOptions[0].pickupIndex.pickupDef.itemTier;
-                    // 最初がTier1だったらTier1のみから抽選
-                    ItemTier lowestItemTier = ItemTier.Tier1;
-                    if (firstTier == ItemTier.Tier1)
+                    // weightedSelectionへアクセスするため
+                    BasicPickupDropTable basicDropTable = self.dropTable as BasicPickupDropTable;
+                    int availableChoiceCount = 0;
+                    if (basicDropTable == null)
                     {
-                        newDropTable.Add(run.availableTier1DropList, 1f);
-                        lowestItemTier = ItemTier.Tier1;
-                    }
-                    else if (firstTier == ItemTier.Tier2)
-                    {
-                        newDropTable.Add(run.availableTier2DropList, 1f);
-                        lowestItemTier = ItemTier.Tier2;
-                    }
-                    else if (firstTier == ItemTier.Tier3)
-                    {
-                        newDropTable.Add(run.availableTier3DropList, 1f);
-                        lowestItemTier = ItemTier.Tier3;
-                    }
-                    PickupIndex[] pickupIndices = newDropTable.GenerateUniqueDropsPreReplacement(4, self.rng);
-                    foreach(PickupIndex pickupIndex in pickupIndices)
-                    {
-                        pickerOptions.Add(new PickupPickerController.Option
+                        // キャストに失敗した場合、自分で構築する
+                        if (firstTier == ItemTier.Tier1)
                         {
-                            available = true,
-                            pickupIndex = pickupIndex
-                        });
+                            newDropTable.Add(run.availableTier1DropList, 1f);
+                            availableChoiceCount = run.availableTier1DropList.Count;
+                        }
+                        else if (firstTier == ItemTier.Tier2)
+                        {
+                            newDropTable.Add(run.availableTier2DropList, 1f);
+                            availableChoiceCount = run.availableTier2DropList.Count;
+                        }
+                        else if (firstTier == ItemTier.Tier3)
+                        {
+                            newDropTable.Add(run.availableTier3DropList, 1f);
+                            availableChoiceCount = run.availableTier3DropList.Count;
+                        }
                     }
+                    else
+                    {
+                        // キャストに成功した場合、継承する
+                        // この方式なら、回復箱・攻撃箱に対応できる
+                        // 参照すると元の確率を壊してしまうかもなのでダメ
+                        //newDropTable.selector = basicDropTable.selector;
+                        int choiceIndex = 0;
+                        foreach(var choice in basicDropTable.selector.choices)
+                        {
+                            // 最初のTierと一致しないものは選ばれないようにする
+                            if (choice.value.pickupDef.itemTier != firstTier)
+                            {
+                                // 重みでの制御が効かないので、そもそも選択肢を追加しない
+                                //newDropTable.selector.AddChoice(choice.value, 0.0001f);
+                            }
+                            else
+                            {
+                                newDropTable.selector.AddChoice(choice.value, 1f);
+                                availableChoiceCount++;
+                            }
+                            choiceIndex++;
+                        }
+                    }
+                    // 最初の抽選は含めず、新しいものを5つ生成
+                    // これで被りが出ず、必ず5つにできる
+                    // GenerateUniqueDropsは被り無しで生成
+                    // 5以下の選択肢の時があるのでminを取る
+                    int choiceCount = Math.Min(availableChoiceCount, 5);
+                    //PickupIndex[] pickupIndices = newDropTable.GenerateUniqueDropsPreReplacement(choiceCount, self.rng);
+                    //int j = 0;
+                    PickupPickerController.Option[] newOptions = PickupPickerController.GenerateOptionsFromDropTable(choiceCount, newDropTable, self.rng);
+                    //foreach(PickupIndex pickupIndex in pickupIndices)
+                    //{
+                    //    newOptions[j] = new PickupPickerController.Option
+                    //    {
+                    //        available = true,
+                    //        pickupIndex = pickupIndex
+                    //    };
+                    //    j++;
+                    //}
 
                     PickupDropletController.CreatePickupDroplet(new GenericPickupController.CreatePickupInfo
                     {
                         pickupIndex = PickupCatalog.FindPickupIndex(lowestItemTier),
-                        pickerOptions = pickerOptions.ToArray(),
+                        pickerOptions = newOptions,
                         //pickerOptions = PickupPickerController.SetOptionsFromInteractor(),
                         rotation = Quaternion.identity,
                         prefabOverride = OptionPickup
@@ -959,7 +1016,25 @@ namespace RiskOfVampire
                 // 入っていない場合
                 if (!Array.Exists(self.options, option => option.pickupIndex == whiteScrapIndex))
                 {
-                    ItemTier lowestItemTier = self.options[0].pickupIndex.pickupDef.itemTier;
+                    // 最小Tierの判定
+                    //ItemTier lowestItemTier = self.options[0].pickupIndex.pickupDef.itemTier;
+                    ItemTier lowestItemTier = ItemTier.Tier3;
+                    foreach (var option in self.options)
+                    {
+                        if (option.pickupIndex.pickupDef.itemTier == ItemTier.Tier1)
+                        {
+                            lowestItemTier = ItemTier.Tier1;
+                            break;
+                        }
+                        else if (option.pickupIndex.pickupDef.itemTier == ItemTier.Tier2)
+                        {
+                            if (lowestItemTier == ItemTier.Tier3)
+                            {
+                                lowestItemTier = ItemTier.Tier2;
+                            }
+                        }
+                    }
+
                     // 作成するOption list
                     HashSet<PickupPickerController.Option> list = new();
 
@@ -996,6 +1071,10 @@ namespace RiskOfVampire
                                 // allowed.  Proceed to the next.
                             }
                             else
+                            {
+                                continue;
+                            }
+                            if (syncConfig.possessedItemChance < UnityEngine.Random.value)
                             {
                                 continue;
                             }
@@ -1259,6 +1338,11 @@ namespace RiskOfVampire
                 Log.LogInfo("Player pressed F5.");
                 // configをreloadして反映させる
                 ReloadConfig();
+
+                Chat.AddMessage(new Chat.SimpleChatMessage
+                {
+                    baseToken = "Risk of Vampire> Config Reloaded."
+                });
 
                 Logger.LogInfo("Config Reload finished");
 

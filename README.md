@@ -55,7 +55,7 @@ It's easy because you can choose the item. So I added 3 more difficult difficult
 - Possessed Item Chance: The probability that your item will be added to the Item Picker lottery candidates. The higher it is, the easier it is for your items to appear as candidates.
 - The spawn rate of Scrapper, MultiShop, 3D Printer, and Altar of Luck can now be adjusted. It is also possible to set it does not appear.
 - The upper limit of the item slot. It can be set for each white item and green item.
-- You can reload Config with F2 key.
+- You can reload Config with F5 key.
 
 ### Other changes
 - An item selection orb appears instead of an item from the box
@@ -117,7 +117,7 @@ Vampire Survivorsを参考にアイテムの枠上限が導入されました。
 - Possessed Item Chance: 所持アイテムがItem Pickerの抽選候補に加えられる確率。高くするほど、所持アイテムが候補に出やすくなります。
 - Scrapper, MultiShop, 3D Printer, 運の祭壇の出現率が調整可能になりました。出現しなくなる設定も可能です。
 - アイテム枠の上限。白アイテムと緑アイテムそれぞれに設定可能です。
-- F2キーでConfigを再読み込みできます。
+- F5キーでConfigを再読み込みできます。
 
 ### その他の変更
 - 箱からアイテムの代わりにアイテム選択オーブが出現
@@ -133,6 +133,9 @@ Vampire Survivorsを参考にアイテムの枠上限が導入されました。
 Modが入った人同士で問題なく動くことを確認しています。
 
 ## Changelog
+**2.1.0**
+- Fixed the lottery algorithm. The rarity of item picker choices is now unified.
+
 **2.0.3**
 - Fix item picker's lock algorithm. Please update.
 
