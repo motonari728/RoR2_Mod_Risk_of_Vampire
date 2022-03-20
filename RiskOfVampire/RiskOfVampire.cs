@@ -845,29 +845,44 @@ namespace RiskOfVampire
                 Quaternion rotation = Quaternion.AngleAxis(angle, Vector3.up);
                 for (int i = 0; i < self.dropCount; i++)
                 {
-                    // dropTableからの候補の生成
-                    // これが所持アイテムと合わさって最終的な候補となる
-                    PickupPickerController.Option[] pickerOptions = PickupPickerController.GenerateOptionsFromDropTable(5, self.dropTable, self.rng);
-
-                    // dropletの色を抽選結果の最低値のTierの色にする
-                    ItemTier lowestItemTier = ItemTier.Tier3;
-                    foreach(PickupPickerController.Option option in pickerOptions)
+                    // dropTableからの最初の候補の生成
+                    List<PickupPickerController.Option> pickerOptions = PickupPickerController.GenerateOptionsFromDropTable(1, self.dropTable, self.rng).ToList();
+                    // 2つ目以降の抽選テーブル
+                    BasicPickupDropTable newDropTable = ScriptableObject.CreateInstance<BasicPickupDropTable>();
+                    newDropTable.selector.Clear();
+                    Run run = Run.instance;
+                    ItemTier firstTier = pickerOptions[0].pickupIndex.pickupDef.itemTier;
+                    // 最初がTier1だったらTier1のみから抽選
+                    ItemTier lowestItemTier = ItemTier.Tier1;
+                    if (firstTier == ItemTier.Tier1)
                     {
-                        ItemTier itemTier = option.pickupIndex.pickupDef.itemTier;
-                        if (itemTier == ItemTier.Tier1 || itemTier == ItemTier.VoidTier1)
-                        {
-                            lowestItemTier = ItemTier.Tier1;
-                            break;
-                        }
-                        if (itemTier == ItemTier.Tier2 || itemTier == ItemTier.VoidTier2)
-                        {
-                            lowestItemTier = ItemTier.Tier2;
-                        }
+                        newDropTable.Add(run.availableTier1DropList, 1f);
+                        lowestItemTier = ItemTier.Tier1;
                     }
+                    else if (firstTier == ItemTier.Tier2)
+                    {
+                        newDropTable.Add(run.availableTier2DropList, 1f);
+                        lowestItemTier = ItemTier.Tier2;
+                    }
+                    else if (firstTier == ItemTier.Tier3)
+                    {
+                        newDropTable.Add(run.availableTier3DropList, 1f);
+                        lowestItemTier = ItemTier.Tier3;
+                    }
+                    PickupIndex[] pickupIndices = newDropTable.GenerateUniqueDropsPreReplacement(4, self.rng);
+                    foreach(PickupIndex pickupIndex in pickupIndices)
+                    {
+                        pickerOptions.Add(new PickupPickerController.Option
+                        {
+                            available = true,
+                            pickupIndex = pickupIndex
+                        });
+                    }
+
                     PickupDropletController.CreatePickupDroplet(new GenericPickupController.CreatePickupInfo
                     {
                         pickupIndex = PickupCatalog.FindPickupIndex(lowestItemTier),
-                        pickerOptions = pickerOptions,
+                        pickerOptions = pickerOptions.ToArray(),
                         //pickerOptions = PickupPickerController.SetOptionsFromInteractor(),
                         rotation = Quaternion.identity,
                         prefabOverride = OptionPickup
@@ -940,28 +955,14 @@ namespace RiskOfVampire
                 bool isTier2ReachLimit = isLimits[1];
                 
                 // 抽選開始
-                // whiteScrapが入ってなければRolledとみなす
+                // whiteScrapが入っていればRolledとみなす
+                // 入っていない場合
                 if (!Array.Exists(self.options, option => option.pickupIndex == whiteScrapIndex))
                 {
-
-                    ItemTier lowestItemTier = ItemTier.Tier3;
-                    foreach (PickupPickerController.Option option in self.options)
-                    {
-                        ItemTier itemTier = option.pickupIndex.pickupDef.itemTier;
-                        if (itemTier == ItemTier.Tier1 || itemTier == ItemTier.VoidTier1)
-                        {
-                            lowestItemTier = ItemTier.Tier1;
-                            break;
-                        }
-                        if (itemTier == ItemTier.Tier2 || itemTier == ItemTier.VoidTier2)
-                        {
-                            lowestItemTier = ItemTier.Tier2;
-                        }
-                    }
-
-
+                    ItemTier lowestItemTier = self.options[0].pickupIndex.pickupDef.itemTier;
                     // 作成するOption list
                     HashSet<PickupPickerController.Option> list = new();
+
                     // item historyから追加
                     // itemAcquisitionOrderは被りなし、数を保持しない
                     // 数はinventory.GetItemCount(ItemIndex)で調べる
@@ -991,6 +992,7 @@ namespace RiskOfVampire
                             if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3)
                             {
                                 // 確率で弾かず、Tier3以上の全アイテム追加
+                                // ボスアイテムはテレポーターから出る分で十分
                                 // allowed.  Proceed to the next.
                             }
                             else
@@ -999,10 +1001,9 @@ namespace RiskOfVampire
                             }
                         }
                         // 最小がTier2の場合
-                        if (lowestItemTier == ItemTier.Tier2)
+                        else if (lowestItemTier == ItemTier.Tier2)
                         {
-                            ItemTier[] allowed = new ItemTier[] { ItemTier.Tier2, ItemTier.VoidTier2, ItemTier.Tier3, ItemTier.VoidTier3 };
-                            if (allowed.Contains(itemDef.tier))
+                            if (itemDef.tier == ItemTier.Tier2 || itemDef.tier == ItemTier.VoidTier2)
                             {
                                 // allowed. Proceed to the next.
                             }
@@ -1017,16 +1018,22 @@ namespace RiskOfVampire
                                 continue;
                             }
                             // Tier3以上は確率で弾く
-                            if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3
-                                || itemDef.tier == ItemTier.Boss || itemDef.tier == ItemTier.VoidBoss)
-                            {
-                                if (UnityEngine.Random.value > 1f / 10f)
-                                    continue;
-                            }
+                            //if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3
+                            //    || itemDef.tier == ItemTier.Boss || itemDef.tier == ItemTier.VoidBoss)
+                            //{
+                            //    if (UnityEngine.Random.value > 1f / 10f)
+                            //        continue;
+                            //}
                         }
                         // 最小がTier1の場合
-                        if (lowestItemTier == ItemTier.Tier1)
+                        else if (lowestItemTier == ItemTier.Tier1)
                         {
+                            if (itemDef.tier == ItemTier.Tier1 || itemDef.tier == ItemTier.VoidTier1)
+                            {
+                                // proceed to next
+                            }
+                            else { continue; }
+
                             // tier1がまだ埋まっていない場合、抽選で候補に追加しない
                             // 逆にtier1が埋まっている場合は、全て追加する
                             if (!isTier1ReachLimit && syncConfig.possessedItemChance < UnityEngine.Random.value)
@@ -1035,17 +1042,17 @@ namespace RiskOfVampire
                             }
                             // Tier1宝箱は配送要求表と同じドロップ率らしい
                             // 配送要求表は79/20/1%
-                            if (itemDef.tier == ItemTier.Tier2 || itemDef.tier == ItemTier.VoidTier2)
-                            {
-                                if (UnityEngine.Random.value > 1f / 5f)
-                                    continue;
-                            }
-                            else if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3
-                                || itemDef.tier == ItemTier.Boss || itemDef.tier == ItemTier.VoidBoss)
-                            {
-                                if (UnityEngine.Random.value > 1f / 100f)
-                                    continue;
-                            }
+                            //if (itemDef.tier == ItemTier.Tier2 || itemDef.tier == ItemTier.VoidTier2)
+                            //{
+                            //    if (UnityEngine.Random.value > 1f / 5f)
+                            //        continue;
+                            //}
+                            //else if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3
+                            //    || itemDef.tier == ItemTier.Boss || itemDef.tier == ItemTier.VoidBoss)
+                            //{
+                            //    if (UnityEngine.Random.value > 1f / 100f)
+                            //        continue;
+                            //}
                         }
                         // 条件を生き残ったやつを候補に追加する
                         list.Add(new PickupPickerController.Option
@@ -1181,7 +1188,6 @@ namespace RiskOfVampire
             };
             if (containOwnedItem == false)
             {
-                PickupIndex lowestScrapIndex;
                 if (lowestItemTier == ItemTier.Tier1)
                 {
                     // whiteScrapのLockを外す
@@ -1190,7 +1196,6 @@ namespace RiskOfVampire
                 if (lowestItemTier != ItemTier.Tier1)
                 {
                     // lowertItemTierがTier2以上なら、全部greenScrapを追加する
-                    lowestScrapIndex = greenScrapIndex;
                     list.Add(new PickupPickerController.Option
                     {
                         available = true,
