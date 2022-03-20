@@ -36,8 +36,8 @@ After filling the limited slot, only the items you have will come out from the c
 ### Probability of adding possessed items to the item picker
 - White item: 100%
 - Green item: 20%
-- Red item: 5%
-- Boss item: 5%
+- Red item: 1%
+- Boss item: 1%
 - Lunar item: 0%
 - Corrupt(Void) item: See probability of original item
 
@@ -50,7 +50,7 @@ It's easy because you can choose the item. So I added 3 more difficult difficult
 ### Configurable changes
 - OSP Thureshold: One Shot Protection is set to 80% (adjustable), so you won't take more than 80% damage.
 - Invulnerable Time: After OSP is activated, you are invincible for 0.5second (adjustable).
-- Max Heal per Second: Heal is limited to 10% (adjustable) of total HP per second. Carryover is up to 200%. Mainly engineer's fungus countermeasures and prevent to play that recovers instantly.
+- Max Heal per Second: You can limit the amount of heal per second. If set to 1, it will behave the same as vanilla. Less than 1 is the act like you are having Corpse Bloom. The default is 1, which remains vanilla. If you exceed the maximum heal amount per second, you can carry over heal amount up to 200%.
 - Money Scaling: Scaling the price to open a chest.
 - Possessed Item Chance: The probability that your item will be added to the Item Picker lottery candidates. The higher it is, the easier it is for your items to appear as candidates.
 - The spawn rate of Scrapper, MultiShop, 3D Printer, and Altar of Luck can now be adjusted. It is also possible to set it does not appear.
@@ -98,8 +98,8 @@ Vampire Survivorsを参考にアイテムの枠上限が導入されました。
 ### アイテムピッカーへの所持アイテムの追加確率
 - White item: 100%
 - Green item: 20%
-- Red item: 5%
-- Boss item: 5%
+- Red item: 1%
+- Boss item: 1%
 - Lunar item: 0%
 - Corrupt(Void) item: 元のアイテムの確率を参照
 
@@ -112,7 +112,7 @@ Vampire Survivorsを参考にアイテムの枠上限が導入されました。
 ### 設定可能な変更
 - OSP Thureshold: One Shot Protectionを80%(調整可)にしてあるので、80%以上のダメージを食らうことがありません。
 - Invulnerable Time: OSP発動後は、0.5秒(調整可)無敵です。
-- Max Heal per Second: Healは秒間総HPの10%(調整可)が上限にしています。持ち越しは200%までです。主にエンジニアのきのこ対策と瞬時に回復するプレイを防ぐためです。
+- Max Heal per Second: 秒間ヒール量に制限をかけられます。1に設定するとバニラと同じ動作になります。1未満はコープスブルームの動作となります。デフォルトは1でバニラのままです。秒間ヒール量の上限を超えた場合、ヒールの持ち越しは200%までです。
 - Money Scaling: チェストを開ける値段のスケーリング。
 - Possessed Item Chance: 所持アイテムがItem Pickerの抽選候補に加えられる確率。高くするほど、所持アイテムが候補に出やすくなります。
 - Scrapper, MultiShop, 3D Printer, 運の祭壇の出現率が調整可能になりました。出現しなくなる設定も可能です。
@@ -133,6 +133,9 @@ Vampire Survivorsを参考にアイテムの枠上限が導入されました。
 Modが入った人同士で問題なく動くことを確認しています。
 
 ## Changelog
+**2.0.3**
+- Fix item picker's lock algorithm. Please update.
+
 **2.0.2**
 - Boss drops and luck shrine drops are converted to void potentials(item picker).
 

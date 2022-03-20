@@ -169,7 +169,8 @@ namespace RiskOfVampire
                         }
                         // 緑アイテムだったら
                         if (pickupIndex2.pickupDef.itemTier != ItemTier.Boss
-                            && pickupIndex2.pickupDef.itemTier != ItemTier.VoidBoss)
+                            && pickupIndex2.pickupDef.itemTier != ItemTier.VoidBoss
+                            && pickupIndex2.pickupDef.itemTier != ItemTier.Tier3)
                         {
                             var options = PickupPickerController.GenerateOptionsFromDropTable(5, self.dropTable, self.rng);
                             PickupDropletController.CreatePickupDroplet(new GenericPickupController.CreatePickupInfo
@@ -181,7 +182,7 @@ namespace RiskOfVampire
                                 prefabOverride = OptionPickup
                             }, self.dropPosition.position, vector);
                         }
-                        // ボスアイテムだったら元のまま
+                        // ボスアイテムとTier3だったら元のまま
                         else
                         {
                             PickupDropletController.CreatePickupDroplet(pickupIndex2, self.dropPosition.position, vector);
@@ -301,6 +302,14 @@ namespace RiskOfVampire
                 // 現在開いている人のinventory
                 var inventory = self.networkUIPromptController.currentParticipantMaster.inventory;
                 ItemTier itemTier = pickupIndex.pickupDef.itemTier;
+
+                // Scrap選択なら一つ増やして終わり
+                if (pickupIndex.pickupDef.itemIndex == scrapWhite.itemIndex
+                    || pickupIndex.pickupDef.itemIndex == scrapGreen.itemIndex)
+                {
+                    inventory.GiveItem(pickupIndex.pickupDef.itemIndex, 1);
+                    return;
+                }
                 // 対応するScrapを持っていれば追加取得
                 if (itemTier == ItemTier.Tier1 && inventory.GetItemCount(scrapWhite) >= 1)
                 {
@@ -331,15 +340,16 @@ namespace RiskOfVampire
             On.RoR2.Inventory.HandleInventoryChanged += (orig, self) =>
             {
                 orig(self);
-                if (NetworkUser.localPlayers != null)
-                    if (NetworkUser.localPlayers.Count == 1)
-                        if (NetworkUser.localPlayers[0].master != null)
-                            if (NetworkUser.localPlayers[0].master.inventory != null)
-                                if (self == NetworkUser.localPlayers[0].master.inventory)
-                                {
-                                    // OnInventoryChangedからは、isChangedの場合のみ
-                                    ShowItemCount(self, true);
-                                }
+                if (self.isLocalPlayer || self.isClient || self.isServer)
+                    if (NetworkUser.localPlayers != null)
+                        if (NetworkUser.localPlayers.Count == 1)
+                            if (NetworkUser.localPlayers[0].master != null)
+                                if (NetworkUser.localPlayers[0].master.inventory != null)
+                                    if (self == NetworkUser.localPlayers[0].master.inventory)
+                                    {
+                                        // OnInventoryChangedからは、isChangedの場合のみ
+                                        ShowItemCount(self, true);
+                                    }
             };
             On.RoR2.UI.ChatBox.UpdateFade += (orig, self, deltaTime) =>
             {
@@ -470,13 +480,6 @@ namespace RiskOfVampire
                 var choiceInfo = weightedSelection.GetChoice(i);
                 //var prefabName = choiceInfo.value.spawnCard.prefab.name;
                 SpawnCard spawnCard = choiceInfo.value.spawnCard;
-
-                //if (IsMultiShop(spawnCard) || IsScrapper(spawnCard) || IsPrinter(spawnCard) || IsChanceShrine(spawnCard))
-                //{
-                //    chestChance += choiceInfo.weight;
-                //    choiceInfo.weight = 0f;
-                //    weightedSelection.ModifyChoiceWeight(i, 0);
-                //}
 
                 // MultishopOnly を参考にしてる
                 if (IsChest(spawnCard))
@@ -680,7 +683,8 @@ namespace RiskOfVampire
 
                 // デフォルトの難易度だったら、何もしない
                 // デフォルト難易度は0~, Invalidが-1, 追加難易度は-2から負に向かう
-                if ((int)Run.instance.selectedDifficulty >= -1)
+                // ただしMonsoonのみspawn数を調整する
+                if ((int)Run.instance.selectedDifficulty >= -1 && Run.instance.selectedDifficulty != DifficultyIndex.Hard)
                 {
                     return isSpawned;
                 }
@@ -904,13 +908,51 @@ namespace RiskOfVampire
             };
         }
 
+        private bool[] ItemRecountServer(Inventory inventory)
+        {
+            tier1Count = 0;
+            tier2Count = 0;
+            for (int i = 0; i < inventory.itemAcquisitionOrder.Count; i++)
+            {
+                ItemIndex itemIndex = inventory.itemAcquisitionOrder[i];
+                ItemDef itemDef = ItemCatalog.GetItemDef(itemIndex);
+                if (!itemDef)
+                    continue;
+                // スクラップアイテムの除去
+                if (itemDef.ContainsTag(ItemTag.Scrap))
+                    continue;
+                if (!itemDef.canRemove || itemDef.hidden)
+                    continue;
+                // 使用済みアイテムはNoTier
+                if (itemDef.tier == ItemTier.NoTier || itemDef.tier == ItemTier.Lunar)
+                    continue;
+                // bossアイテムは追加しない
+                if (itemDef.tier == ItemTier.Boss || itemDef.tier == ItemTier.VoidBoss)
+                    continue;
+                // Tier1とTier2のアイテムを数える
+                // ここでは種類を数えれば良いので、個数はいらない
+                //int num = inventory.GetItemCount(itemIndex);
+                if (itemDef.tier == ItemTier.Tier1 || itemDef.tier == ItemTier.VoidTier1)
+                    tier1Count += 1;
+                if (itemDef.tier == ItemTier.Tier2 || itemDef.tier == ItemTier.VoidTier2)
+                    tier2Count += 1;
+            }
+
+            isTier1ReachLimit = tier1Count >= syncConfig.whiteItemUpperLimit;
+            isTier2ReachLimit = tier2Count >= syncConfig.greenItemUpperLimit;
+
+            return new bool[] { isTier1ReachLimit, isTier2ReachLimit };
+        }
+
         private void Hook_PickupPicker_OnInteractionBegin()
         {
+            // そもそもこの関数がサーバー側でしか呼びだされない
+            // PickupPickerControllerがNetworkBehaviorだからか？
             On.RoR2.PickupPickerController.OnInteractionBegin += (orig, self, activator) =>
             {
                 // SetOptionsFromInteractor()から内容をコピーした
                 //Logger.LogInfo(activator);
-                //self.
+                // ここからエラーよけ
                 if (self.gameObject.name.Contains("Scrapper"))
                 {
                     orig(self, activator);
@@ -941,13 +983,22 @@ namespace RiskOfVampire
                     orig(self, activator);
                     return;
                 }
+                // ここまでエラーよけ
 
+                PickupIndex whiteScrapIndex = PickupCatalog.FindPickupIndex(scrapWhite.itemIndex);
+                PickupIndex greenScrapIndex = PickupCatalog.FindPickupIndex(scrapGreen.itemIndex);
+                // 上限設定のため、Itemcountを更新する
+                var isLimits = ItemRecountServer(inventory);
+                bool isTier1ReachLimit = isLimits[0];
+                bool isTier2ReachLimit = isLimits[1];
+                
                 // 抽選開始
-                if (self.contextString != "rolled")
+                // whiteScrapが入ってなければRolledとみなす
+                if (!Array.Exists(self.options, option => option.pickupIndex == whiteScrapIndex))
                 {
 
                     ItemTier lowestItemTier = ItemTier.Tier3;
-                    foreach(PickupPickerController.Option option in self.options)
+                    foreach (PickupPickerController.Option option in self.options)
                     {
                         ItemTier itemTier = option.pickupIndex.pickupDef.itemTier;
                         if (itemTier == ItemTier.Tier1 || itemTier == ItemTier.VoidTier1)
@@ -961,10 +1012,9 @@ namespace RiskOfVampire
                         }
                     }
 
-                    ItemRecount(inventory);
 
                     // 作成するOption list
-                    HashSet<PickupPickerController.Option> list = new HashSet<PickupPickerController.Option>();
+                    HashSet<PickupPickerController.Option> list = new();
                     // item historyから追加
                     // itemAcquisitionOrderは被りなし、数を保持しない
                     // 数はinventory.GetItemCount(ItemIndex)で調べる
@@ -995,7 +1045,8 @@ namespace RiskOfVampire
                             {
                                 // 確率で弾かず、Tier3以上の全アイテム追加
                                 // allowed.  Proceed to the next.
-                            } else
+                            }
+                            else
                             {
                                 continue;
                             }
@@ -1007,13 +1058,14 @@ namespace RiskOfVampire
                             if (allowed.Contains(itemDef.tier))
                             {
                                 // allowed. Proceed to the next.
-                            } else
+                            }
+                            else
                             {
                                 continue;
                             }
                             // tier2がまだ埋まっていない場合、抽選で候補に追加しない
                             // 逆にtier2が埋まっている場合は、全て追加する
-                            if (!isTier2ReachLimit && syncConfig.possessedItemChance > UnityEngine.Random.value)
+                            if (!isTier2ReachLimit && syncConfig.possessedItemChance < UnityEngine.Random.value)
                             {
                                 continue;
                             }
@@ -1030,10 +1082,12 @@ namespace RiskOfVampire
                         {
                             // tier1がまだ埋まっていない場合、抽選で候補に追加しない
                             // 逆にtier1が埋まっている場合は、全て追加する
-                            if (!isTier1ReachLimit && syncConfig.possessedItemChance > UnityEngine.Random.value)
+                            if (!isTier1ReachLimit && syncConfig.possessedItemChance < UnityEngine.Random.value)
                             {
                                 continue;
                             }
+                            // Tier1宝箱は配送要求表と同じドロップ率らしい
+                            // 配送要求表は79/20/1%
                             if (itemDef.tier == ItemTier.Tier2 || itemDef.tier == ItemTier.VoidTier2)
                             {
                                 if (UnityEngine.Random.value > 1f / 5f)
@@ -1042,7 +1096,7 @@ namespace RiskOfVampire
                             else if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3
                                 || itemDef.tier == ItemTier.Boss || itemDef.tier == ItemTier.VoidBoss)
                             {
-                                if (UnityEngine.Random.value > 1f / 20f)
+                                if (UnityEngine.Random.value > 1f / 100f)
                                     continue;
                             }
                         }
@@ -1053,13 +1107,6 @@ namespace RiskOfVampire
                             pickupIndex = pickupIndex
                         });
                     }
-
-                    // 3以下のときはもう1つ加える
-                    // 別の人が開けた場合、optionsは2つしか入っていない。３つ目はないものとして扱うこと！
-                    //if (self.options.Count() <= 3)
-                    //{
-                    //    list.Add(self.options[1]);
-                    //}
 
                     // ランダムアイテムを加える
                     int addItemCount = syncConfig.randomItemAddPoolCount;
@@ -1074,6 +1121,7 @@ namespace RiskOfVampire
                         addItemCount = 4 - list.Count;
                     // self.optionsの数以上を追加しないように
                     addItemCount = Math.Min(addItemCount, self.options.Length);
+
                     for (var i = 0; i < addItemCount; i++)
                     {
                         var option = self.options[i];
@@ -1100,145 +1148,114 @@ namespace RiskOfVampire
                             list.Add(self.options[i]);
                         }
                     }
-
                     // shuffleして先頭nつだけ残す
                     List<PickupPickerController.Option> rolledList = list.ToList().OrderBy(x => UnityEngine.Random.value)
                         .Take(syncConfig.itemPickerOptionAmount).ToList();
 
-                    bool isAlreadyHave = false;
-                    lowestItemTier = ItemTier.Tier3;
-                    foreach(PickupPickerController.Option option in rolledList)
-                    { 
-                        // すでに持っているかチェックする
-                        if (inventory.GetItemCount(option.pickupIndex.pickupDef.itemIndex) >= 1)
-                        {
-                            isAlreadyHave = true;
-                        }
-                        // rolledListの最小Tierの判定
-                        ItemTier itemTier = option.pickupIndex.pickupDef.itemTier;
-                        if (itemTier == ItemTier.Tier1 || itemTier == ItemTier.VoidTier1)
-                        {
-                            lowestItemTier = ItemTier.Tier1;
-                            break;
-                        }
-                        if (itemTier == ItemTier.Tier2 || itemTier == ItemTier.VoidTier2)
-                        {
-                            lowestItemTier = ItemTier.Tier2;
-                        }
-                    }
-
-                    // 持っていなかったらScrapを選択肢に追加
-                    if (isAlreadyHave == false)
-                    {
-                        if (lowestItemTier == ItemTier.Tier1)
-                        {
-                            PickupIndex pickupIndex = PickupCatalog.FindPickupIndex(scrapWhite.itemIndex);
-                            rolledList.Add(new PickupPickerController.Option
-                            {
-                                available = true,
-                                pickupIndex = pickupIndex
-                            });
-                        }
-                        else
-                        {
-                            // lowestがTier1じゃなかったら緑Scrapを必ず追加
-                            PickupIndex pickupIndex = PickupCatalog.FindPickupIndex(scrapGreen.itemIndex);
-                            rolledList.Add(new PickupPickerController.Option
-                            {
-                                available = true,
-                                pickupIndex = pickupIndex
-                            });
-                        }
-                        // lowestがtier3ならスクラップは追加しない
-                    }
-
-                    //Logger.LogInfo(rolledList);
-                    self.SetOptionsServer(rolledList.ToArray());
-                    self.contextString = "rolled";
+                    ItemLockandAddScrap(self, inventory, rolledList, isTier1ReachLimit, isTier2ReachLimit);
+                    //self.contextString = "Rolled";
                 }
                 else
                 {
                     // すでにrolledだった場合
-                    //for (int i = 0; i < self.options.Length; i++)
-                    //{
-                    //    self.options[i].available = false;
-                    //}
                     var list = self.options.ToList<PickupPickerController.Option>();
-                    PickupIndex whiteScrapIndex = PickupCatalog.FindPickupIndex(RoR2.RoR2Content.Items.ScrapWhite.itemIndex);
-                    PickupIndex greenScrapIndex = PickupCatalog.FindPickupIndex(RoR2.RoR2Content.Items.ScrapGreen.itemIndex);
-                    list.RemoveAll(x => x.pickupIndex == whiteScrapIndex || x.pickupIndex == greenScrapIndex);
-
-                    bool containOwnedItem = false;
-                    ItemTier lowestItemTier = ItemTier.Tier3;
-                    for (var i = 0; i < list.Count; i++)
-                    {
-                        // 一つ以上保有するアイテムを含むか
-                        int inventoryCount = inventory.GetItemCount(list[i].pickupIndex.pickupDef.itemIndex);
-                        if (inventoryCount >= 1)
-                            containOwnedItem = true;
-                        // 最小Tierはいくつか
-                        var itemTier = list[i].pickupIndex.pickupDef.itemTier;
-                        if (itemTier == ItemTier.Tier1)
-                        {
-                            lowestItemTier = ItemTier.Tier1;
-                        }
-                        else if (itemTier == ItemTier.Tier2)
-                        {
-                            if (lowestItemTier == ItemTier.Tier3)
-                            {
-                                lowestItemTier = ItemTier.Tier2;
-                            }
-                        }
-                        // 持っていない、かつ各TierがLimitに達していたらavailable=false
-                        if (inventoryCount < 1 && isTier1ReachLimit && itemTier == ItemTier.Tier1)
-                        {
-                            // これだとエラーなので新規作成する必要がある
-                            //list[i].available = false;
-                            list[i] = new PickupPickerController.Option
-                            {
-                                available = false,
-                                pickupIndex = list[i].pickupIndex
-                            };
-                        }
-                        else if (inventoryCount < 1 && isTier2ReachLimit && itemTier == ItemTier.Tier2)
-                        {
-                            list[i] = new PickupPickerController.Option
-                            {
-                                available = false,
-                                pickupIndex = list[i].pickupIndex
-                            };
-                        }
-                    }
-                    // 所持アイテムが無かったらlowestTierのscrapを追加
-                    // 所持アイテムがあるなら、それを取れるのでscrapはいらない
-                    if (containOwnedItem == false)
-                    {
-                        PickupIndex? lowestScrapIndex = null;
-                        if (lowestItemTier == ItemTier.Tier1)
-                        {
-                            lowestScrapIndex = whiteScrapIndex;
-                        }
-                        else
-                        {
-                            // lowertItemTierがTier2以上なら、必ずgreenScrapを追加する
-                            lowestScrapIndex = greenScrapIndex;
-                        }
-                        if (lowestScrapIndex != null)
-                        {
-                            list.Add(new PickupPickerController.Option
-                            {
-                                available = true,
-                                pickupIndex = (PickupIndex)lowestScrapIndex
-                            });
-                        }
-                    }
-
-                    self.SetOptionsServer(list.ToArray());
+                    ItemLockandAddScrap(self, inventory, list, isTier1ReachLimit, isTier2ReachLimit);
                 }
-
                 // 先にoptionsの中身を変えてから、もとのOnInteractionBeginを呼び出す。
                 orig(self, activator);
             };
+        }
+
+        private void ItemLockandAddScrap(PickupPickerController self, Inventory inventory, List<PickupPickerController.Option> list, bool isTier1ReachLimit, bool isTier2ReachLimit)
+        {
+            PickupIndex whiteScrapIndex = PickupCatalog.FindPickupIndex(scrapWhite.itemIndex);
+            PickupIndex greenScrapIndex = PickupCatalog.FindPickupIndex(scrapGreen.itemIndex);
+            bool containOwnedItem = false;
+            ItemTier lowestItemTier = ItemTier.Tier3;
+            // スクラップは一旦全部除去
+            list.RemoveAll(x => x.pickupIndex == whiteScrapIndex || x.pickupIndex == greenScrapIndex);
+            // 一旦全部available=trueにして開放する
+            for(var i = 0; i< list.Count; i++)
+            {
+                list[i] = new PickupPickerController.Option
+                {
+                    available = true,
+                    pickupIndex = list[i].pickupIndex
+                };
+            }
+
+            // 所持アイテムでなく、アイテム上限だったらavailable=falseにする
+            for (var i = 0; i < list.Count; i++)
+            {
+                // 一つ以上保有するアイテムを含むか
+                int inventoryCount = inventory.GetItemCount(list[i].pickupIndex.pickupDef.itemIndex);
+                if (inventoryCount >= 1)
+                    containOwnedItem = true;
+                // 最小Tierはいくつか
+                var itemTier = list[i].pickupIndex.pickupDef.itemTier;
+                if (itemTier == ItemTier.Tier1)
+                {
+                    lowestItemTier = ItemTier.Tier1;
+                }
+                else if (itemTier == ItemTier.Tier2)
+                {
+                    if (lowestItemTier == ItemTier.Tier3)
+                    {
+                        lowestItemTier = ItemTier.Tier2;
+                    }
+                }
+                // 持っていない、かつ各TierがLimitに達していたらavailable=false
+                if (inventoryCount < 1 && isTier1ReachLimit && (itemTier == ItemTier.Tier1 || itemTier == ItemTier.VoidTier1))
+                {
+                    // これだとエラーなので新規作成する必要がある
+                    //list[i].available = false;
+                    list[i] = new PickupPickerController.Option
+                    {
+                        available = false,
+                        pickupIndex = list[i].pickupIndex
+                    };
+                }
+                else if (inventoryCount < 1 && isTier2ReachLimit && (itemTier == ItemTier.Tier2 || itemTier == ItemTier.VoidTier2))
+                {
+                    list[i] = new PickupPickerController.Option
+                    {
+                        available = false,
+                        pickupIndex = list[i].pickupIndex
+                    };
+                }
+            }
+
+            // Rolled判定のために常にwhiteScrapをavailable=false以上で追加
+            // 所持アイテムがあるなら、それを取れるのでscrapはいらない
+            var whiteScrapOption = new PickupPickerController.Option
+            {
+                available = false,
+                pickupIndex = whiteScrapIndex
+            };
+            if (containOwnedItem == false)
+            {
+                PickupIndex lowestScrapIndex;
+                if (lowestItemTier == ItemTier.Tier1)
+                {
+                    // whiteScrapのLockを外す
+                    whiteScrapOption.available = true;
+                }
+                if (lowestItemTier != ItemTier.Tier1)
+                {
+                    // lowertItemTierがTier2以上なら、全部greenScrapを追加する
+                    lowestScrapIndex = greenScrapIndex;
+                    list.Add(new PickupPickerController.Option
+                    {
+                        available = true,
+                        pickupIndex = greenScrapIndex
+                    });
+                }
+            }
+            list.Add(whiteScrapOption);
+            // localメソッドっぽい
+            // この中で実際にpickupOptionsのUIを書き換えてる
+            // そもそもselfがNetworkBehaviorだが挙動がわからない
+            self.SetOptionsServer(list.ToArray());
         }
 
         private void DefineDifficulties()
@@ -1249,7 +1266,7 @@ namespace RiskOfVampire
             // difficultyDefs[2]がmonsoon
             // DnSpyではreadonlyだが書き換えできる
 
-            this.difficulty4Def = new DifficultyDef(4f, "DestinyDifficulty_4_NAME", "Step13", "DestinyDifficulty_4_DESCRIPTION",
+            this.difficulty4Def = new(4f, "DestinyDifficulty_4_NAME", "Step13", "DestinyDifficulty_4_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
             this.difficulty4Def.foundIconSprite = true;
             this.difficulty4Def.iconSprite = MonsoonIcon;
@@ -1257,7 +1274,7 @@ namespace RiskOfVampire
             LanguageAPI.Add(this.difficulty4Def.nameToken, "Destiny");
             LanguageAPI.Add(this.difficulty4Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+100%</style></style>");
 
-            this.difficulty45Def = new DifficultyDef(4.5f, "DestinyDifficulty_45_NAME", "Step13", "DestinyDifficulty_45_DESCRIPTION",
+            this.difficulty45Def = new(4.5f, "DestinyDifficulty_45_NAME", "Step13", "DestinyDifficulty_45_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
             this.difficulty45Def.foundIconSprite = true;
             this.difficulty45Def.iconSprite = MonsoonIcon;
@@ -1265,7 +1282,7 @@ namespace RiskOfVampire
             LanguageAPI.Add(this.difficulty45Def.nameToken, "Destiny");
             LanguageAPI.Add(this.difficulty45Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+125%</style></style>");
 
-            this.difficulty5Def = new DifficultyDef(5f, "DestinyDifficulty_5_NAME", "Step13", "DestinyDifficulty_5_DESCRIPTION",
+            this.difficulty5Def = new(5f, "DestinyDifficulty_5_NAME", "Step13", "DestinyDifficulty_5_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
             this.difficulty5Def.foundIconSprite = true;
             this.difficulty5Def.iconSprite = MonsoonIcon;
