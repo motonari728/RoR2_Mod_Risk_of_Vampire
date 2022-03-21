@@ -33,18 +33,11 @@ namespace RiskOfVampire
         public const string PluginAuthor = "mochi";
         // PluginNameに空白を入れると読み込まれない
         public const string PluginName = "RiskOfVampire";
-        public const string PluginVersion = "2.0.0";
+        public const string PluginVersion = "2.1.0";
 
         public static GameObject OptionPickup;
         public static Sprite MonsoonIcon;
         public static GameObject ChatPrefab;
-
-        public static DifficultyDef difficulty4Def;
-        public static DifficultyIndex difficulty4Index;
-        public static DifficultyDef difficulty45Def;
-        public static DifficultyIndex difficulty45Index;
-        public static DifficultyDef difficulty5Def;
-        public static DifficultyIndex difficulty5Index;
 
         internal static SyncConfig syncConfig;
 
@@ -79,6 +72,8 @@ namespace RiskOfVampire
         private static ConfigEntry<float> PrinterSpawnChance;
         private static ConfigEntry<float> ObjectSumMultiply;
         private static ConfigEntry<float> ChanceShrineSpawnChance;
+        private static ConfigEntry<float> VoidItemPodSpawnChance;
+
         private static ConfigEntry<float> HealMultiply;
 
 
@@ -108,8 +103,85 @@ namespace RiskOfVampire
             Hook_forItemSelect();
             Hook_ShrineDrop();
             Hook_BossDrop();
+            Hook_DifficultyScaling();
 
-            //Log.LogInfo(nameof(Awake) + " done.");
+        }
+
+        private void Hook_DifficultyScaling()
+        {
+            On.RoR2.Run.RecalculateDifficultyCoefficentInternal += (orig, self) =>
+            {
+                if (IsDefaultDifficulty())
+                {
+                    orig(self);
+                }
+                else
+                {
+                    // 書き換え時、thisにもselfにもambientLevelFloorがあるから注意
+
+                    // Default 1.15f
+                    // ステージ5でのステージ係数.これが時間Lvとかけ合わさって最終Lvになる
+                    // 1.15^5 = 2.0
+                    // 1.10^5 = 1.6
+                    // 1.05^5 = 1.3
+                    // ステージ10のとき
+                    // 1.15^10 = 4.0
+                    // 1.10^10 = 2.6
+                    // 1.05^10 = 1.6
+                    float stageDifficultyCoefficient = 1.05f;
+                    // 時間係数. これが最終Lvに倍数として掛かる
+                    // Default 1.0f
+                    //ステージ2のとき
+                    // 時間係数が高いと、ステージ2で急にレベルが上がる
+                    // 1.15^1 * 1.0 = 1.15
+                    // 1.10^1 * 1.2 = 1.32
+                    // 1.10^1 * 1.3 = 1.43
+                    // 1.05^1 * 1.5 = 1.57
+                    // 1.05^1 * 1.6 = 1.68
+                    // ステージ6のとき
+                    // 1.15^5 * 1.0 = 2.00
+                    // 1.10^5 * 1.2 = 1.93
+                    // 1.10^5 * 1.3 = 2.09
+                    // 1.05^5 * 1.5 = 1.91
+                    // 1.05^5 * 1.6 = 2.04
+                    // ステージ11のとき
+                    // 2週目で狂気的なスケーリングをしないために、2週目の係数は低くて良い
+                    // 1.15^10 * 1.0 = 4.00
+                    // 1.10^10 * 1.2 = 3.11
+                    // 1.10^10 * 1.3 = 3.37
+                    // 1.05^10 * 1.5 = 2.44
+                    // 1.05^10 * 1.6 = 2.60
+                    float timeDifficultyCoefficient = 1.5f;
+
+                    float num = self.GetRunStopwatch() * timeDifficultyCoefficient;
+                    DifficultyDef difficultyDef = DifficultyCatalog.GetDifficultyDef(self.selectedDifficulty);
+                    float num2 = Mathf.Floor(num * 0.016666668f);
+                    float num3 = (float)self.participatingPlayerCount * 0.3f;
+                    float num4 = 0.7f + num3;
+                    float num5 = 0.7f + num3;
+                    float num6 = Mathf.Pow((float)self.participatingPlayerCount, 0.2f);
+                    float num7 = 0.0506f * difficultyDef.scalingValue * num6;
+                    float num8 = 0.0506f * difficultyDef.scalingValue * num6;
+                    // Modified
+                    float num9 = Mathf.Pow(stageDifficultyCoefficient, (float)self.stageClearCount);
+                    self.compensatedDifficultyCoefficient = (num5 + num8 * num2) * num9;
+                    self.difficultyCoefficient = (num4 + num7 * num2) * num9;
+                    float num10 = (num4 + num7 * (num * 0.016666668f)) * Mathf.Pow(stageDifficultyCoefficient, (float)self.stageClearCount);
+                    self.ambientLevel = Mathf.Min((num10 - num4) / 0.33f + 1f, (float)Run.ambientLevelCap);
+                    int ambientLevelFloor = this.ambientLevelFloor;
+                    self.ambientLevelFloor = Mathf.FloorToInt(self.ambientLevel);
+                    if (ambientLevelFloor != self.ambientLevelFloor && ambientLevelFloor != 0 && self.ambientLevelFloor > ambientLevelFloor)
+                    {
+                        self.OnAmbientLevelUp();
+                    }
+                }
+            };
+        }
+
+        private bool IsDefaultDifficulty()
+        {
+            // デフォルト難易度は0~, Invalidが-1, 追加難易度は-2から負に向かう
+            return (int)Run.instance.selectedDifficulty >= -1;
         }
 
         private static void Hook_BossDrop()
@@ -497,8 +569,18 @@ namespace RiskOfVampire
                 {
                     weightedSelection.ModifyChoiceWeight(i, choiceInfo.weight * ChanceShrineSpawnChance.Value);
                 }
+                else if (IsVoidPod(spawnCard))
+                {
+                    weightedSelection.ModifyChoiceWeight(i, choiceInfo.weight * VoidItemPodSpawnChance.Value);
+                }
             }
             return weightedSelection;
+        }
+
+        private bool IsVoidPod(SpawnCard spawnCard)
+        {
+            string a = spawnCard.name.ToLower();
+            return a == "iscVoidChest".ToLower();
         }
 
         private bool IsMultiShop(SpawnCard spawnCard)
@@ -685,8 +767,8 @@ namespace RiskOfVampire
                     {
                         // origの中でthis.monsterCredit -= (float)self.currentMonsterCard.cost;される
                         // costを戻してやる
-                        // spawn * 1.5
-                        self.monsterCredit += (float)self.currentMonsterCard.cost / 2f;
+                        // spawn * 1.25
+                        self.monsterCredit += (float)self.currentMonsterCard.cost * (1f / 4f);
                     }
                     // 15レベル以降は増やしすぎるときつい
                     else if (this.ambientLevelFloor <= 15)
@@ -750,6 +832,8 @@ namespace RiskOfVampire
                 new ConfigDescription("Multiply the spawn weight of 3D Printer. 0 is None. 1 is Original weight"));
             ChanceShrineSpawnChance = Config.Bind("Spawn", "LuckShrine spawn chance", 0.5f,
                 new ConfigDescription("Multiply the spawn weight of LuckShrine. 0 is None. 1 is Original weight"));
+            VoidItemPodSpawnChance = Config.Bind("Spawn", "VoidItem Pod spawn chance", 0.5f,
+                new ConfigDescription("Multiply the spawn weight of VoidItem Pod. 0 is None. 1 is Original weight"));
 
             HealMultiply = Config.Bind("Stats", "Healing amount modify", 0.6f,
                 new ConfigDescription("Multiply the amount of healing. If you enter 0.6, amount of all heal excluding regen will be 60%. Only valid for additional difficulty"));
@@ -1034,6 +1118,14 @@ namespace RiskOfVampire
                             }
                         }
                     }
+                    // すべてvoidTierだったら
+                    if (self.options.All(option => option.pickupIndex.pickupDef.itemTier == ItemTier.VoidTier1
+                        || option.pickupIndex.pickupDef.itemTier == ItemTier.VoidTier2
+                        || option.pickupIndex.pickupDef.itemTier == ItemTier.VoidTier3))
+                    {
+                        lowestItemTier = ItemTier.VoidTier1;
+                    }
+
 
                     // 作成するOption list
                     HashSet<PickupPickerController.Option> list = new();
@@ -1061,14 +1153,31 @@ namespace RiskOfVampire
                         // bossアイテムは追加しない
                         if (itemDef.tier == ItemTier.Boss || itemDef.tier == ItemTier.VoidBoss)
                             continue;
+                        // すべてがVoidアイテムの場合
+                        if (lowestItemTier == ItemTier.VoidTier1){
+                            if (itemDef.tier == ItemTier.VoidTier1 || itemDef.tier == ItemTier.VoidTier2
+                                || itemDef.tier == ItemTier.VoidTier3)
+                            {
+                                // pass
+                            }
+                            else
+                            {
+                                continue;
+                            }
+                            // 確率で弾く
+                            if (syncConfig.possessedItemChance < UnityEngine.Random.value)
+                            {
+                                continue;
+                            }
+                        }
                         // 最小がTier3の場合
-                        if (lowestItemTier == ItemTier.Tier3)
+                        else if (lowestItemTier == ItemTier.Tier3)
                         {
                             if (itemDef.tier == ItemTier.Tier3 || itemDef.tier == ItemTier.VoidTier3)
                             {
                                 // 確率で弾かず、Tier3以上の全アイテム追加
                                 // ボスアイテムはテレポーターから出る分で十分
-                                // allowed.  Proceed to the next.
+                                // pass
                             }
                             else
                             {
@@ -1084,7 +1193,7 @@ namespace RiskOfVampire
                         {
                             if (itemDef.tier == ItemTier.Tier2 || itemDef.tier == ItemTier.VoidTier2)
                             {
-                                // allowed. Proceed to the next.
+                                // pass
                             }
                             else
                             {
@@ -1109,7 +1218,7 @@ namespace RiskOfVampire
                         {
                             if (itemDef.tier == ItemTier.Tier1 || itemDef.tier == ItemTier.VoidTier1)
                             {
-                                // proceed to next
+                                // pass
                             }
                             else { continue; }
 
@@ -1296,32 +1405,55 @@ namespace RiskOfVampire
             // default difficulty 1: 1f, 2: 2f, 3:3f
             // difficultyDefs[2]がmonsoon
             // DnSpyではreadonlyだが書き換えできる
+            // Noral(2)基準の難易度計算 (x-2)/2
+
+            DifficultyDef difficulty4Def;
+            DifficultyDef difficulty45Def;
+            DifficultyDef difficulty5Def;
+            DifficultyDef difficulty55Def;
+            DifficultyDef difficulty6Def;
 
             difficulty4Def = new(4f, "DestinyDifficulty_4_NAME", "Step13", "DestinyDifficulty_4_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
             difficulty4Def.foundIconSprite = true;
             difficulty4Def.iconSprite = MonsoonIcon;
-            difficulty4Index = DifficultyAPI.AddDifficulty(difficulty4Def);
-            LanguageAPI.Add(difficulty4Def.nameToken, "Destiny");
+            DifficultyAPI.AddDifficulty(difficulty4Def);
+            LanguageAPI.Add(difficulty4Def.nameToken, "Destiny 1");
             LanguageAPI.Add(difficulty4Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+100%</style></style>");
 
             difficulty45Def = new(4.5f, "DestinyDifficulty_45_NAME", "Step13", "DestinyDifficulty_45_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
             difficulty45Def.foundIconSprite = true;
             difficulty45Def.iconSprite = MonsoonIcon;
-            difficulty45Index = DifficultyAPI.AddDifficulty(difficulty45Def);
-            LanguageAPI.Add(difficulty45Def.nameToken, "Destiny");
+            DifficultyAPI.AddDifficulty(difficulty45Def);
+            LanguageAPI.Add(difficulty45Def.nameToken, "Destiny 2");
             LanguageAPI.Add(difficulty45Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+125%</style></style>");
 
             difficulty5Def = new(5f, "DestinyDifficulty_5_NAME", "Step13", "DestinyDifficulty_5_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
             difficulty5Def.foundIconSprite = true;
             difficulty5Def.iconSprite = MonsoonIcon;
-            difficulty5Index = DifficultyAPI.AddDifficulty(difficulty5Def);
-            LanguageAPI.Add(difficulty5Def.nameToken, "Destiny");
+            DifficultyAPI.AddDifficulty(difficulty5Def);
+            LanguageAPI.Add(difficulty5Def.nameToken, "Destiny 3");
             LanguageAPI.Add(difficulty5Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+150%</style></style>");
 
-            //Logger.LogInfo(DifficultyCatalog.difficultyDefs);
+            difficulty55Def = new(5.5f, "DestinyDifficulty_55_NAME", "Step13", "DestinyDifficulty_55_DESCRIPTION",
+                ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
+            difficulty55Def.foundIconSprite = true;
+            difficulty55Def.iconSprite = MonsoonIcon;
+            DifficultyAPI.AddDifficulty(difficulty55Def);
+            LanguageAPI.Add(difficulty55Def.nameToken, "Impossible 1");
+            LanguageAPI.Add(difficulty55Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+175%</style></style>");
+
+            difficulty6Def = new(6f, "DestinyDifficulty_6_NAME", "Step13", "DestinyDifficulty_6_DESCRIPTION",
+                ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
+            difficulty6Def.foundIconSprite = true;
+            difficulty6Def.iconSprite = MonsoonIcon;
+            DifficultyAPI.AddDifficulty(difficulty6Def);
+            LanguageAPI.Add(difficulty6Def.nameToken, "Impossible 2");
+            LanguageAPI.Add(difficulty6Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+200%</style></style>");
+
+            Logger.LogInfo(DifficultyCatalog.difficultyDefs);
         }
 
 
