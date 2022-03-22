@@ -33,7 +33,7 @@ namespace RiskOfVampire
         public const string PluginAuthor = "mochi";
         // PluginNameに空白を入れると読み込まれない
         public const string PluginName = "RiskOfVampire";
-        public const string PluginVersion = "2.1.0";
+        public const string PluginVersion = "2.1.1";
 
         public static GameObject OptionPickup;
         public static Sprite MonsoonIcon;
@@ -763,7 +763,7 @@ namespace RiskOfVampire
                 }
                 if (isSpawned == true)
                 {
-                    if (this.ambientLevelFloor <= 9)
+                    if (this.ambientLevelFloor <= 3)
                     {
                         // origの中でthis.monsterCredit -= (float)self.currentMonsterCard.cost;される
                         // costを戻してやる
@@ -774,7 +774,7 @@ namespace RiskOfVampire
                     else if (this.ambientLevelFloor <= 15)
                     {
                         // spawn * 1.25
-                        self.monsterCredit += (float)self.currentMonsterCard.cost * (1f / 4f);
+                        //self.monsterCredit += (float)self.currentMonsterCard.cost * (1f / 4f);
                     }
                 }
                 return isSpawned;
@@ -1407,19 +1407,21 @@ namespace RiskOfVampire
             // DnSpyではreadonlyだが書き換えできる
             // Noral(2)基準の難易度計算 (x-2)/2
 
-            DifficultyDef difficulty4Def;
+            DifficultyDef difficulty40Def;
             DifficultyDef difficulty45Def;
-            DifficultyDef difficulty5Def;
+            DifficultyDef difficulty50Def;
             DifficultyDef difficulty55Def;
-            DifficultyDef difficulty6Def;
+            DifficultyDef difficulty60Def;
+            DifficultyDef difficulty65Def;
+            DifficultyDef difficulty70Def;
 
-            difficulty4Def = new(4f, "DestinyDifficulty_4_NAME", "Step13", "DestinyDifficulty_4_DESCRIPTION",
+            difficulty40Def = new(4f, "DestinyDifficulty_40_NAME", "Step13", "DestinyDifficulty_40_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
-            difficulty4Def.foundIconSprite = true;
-            difficulty4Def.iconSprite = MonsoonIcon;
-            DifficultyAPI.AddDifficulty(difficulty4Def);
-            LanguageAPI.Add(difficulty4Def.nameToken, "Destiny 1");
-            LanguageAPI.Add(difficulty4Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+100%</style></style>");
+            difficulty40Def.foundIconSprite = true;
+            difficulty40Def.iconSprite = MonsoonIcon;
+            DifficultyAPI.AddDifficulty(difficulty40Def);
+            LanguageAPI.Add(difficulty40Def.nameToken, "Destiny 1");
+            LanguageAPI.Add(difficulty40Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+100%</style></style>");
 
             difficulty45Def = new(4.5f, "DestinyDifficulty_45_NAME", "Step13", "DestinyDifficulty_45_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
@@ -1429,31 +1431,45 @@ namespace RiskOfVampire
             LanguageAPI.Add(difficulty45Def.nameToken, "Destiny 2");
             LanguageAPI.Add(difficulty45Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+125%</style></style>");
 
-            difficulty5Def = new(5f, "DestinyDifficulty_5_NAME", "Step13", "DestinyDifficulty_5_DESCRIPTION",
+            difficulty50Def = new(5f, "DestinyDifficulty_50_NAME", "Step13", "DestinyDifficulty_50_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
-            difficulty5Def.foundIconSprite = true;
-            difficulty5Def.iconSprite = MonsoonIcon;
-            DifficultyAPI.AddDifficulty(difficulty5Def);
-            LanguageAPI.Add(difficulty5Def.nameToken, "Destiny 3");
-            LanguageAPI.Add(difficulty5Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+150%</style></style>");
+            difficulty50Def.foundIconSprite = true;
+            difficulty50Def.iconSprite = MonsoonIcon;
+            DifficultyAPI.AddDifficulty(difficulty50Def);
+            LanguageAPI.Add(difficulty50Def.nameToken, "Destiny 3");
+            LanguageAPI.Add(difficulty50Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+150%</style></style>");
 
             difficulty55Def = new(5.5f, "DestinyDifficulty_55_NAME", "Step13", "DestinyDifficulty_55_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
             difficulty55Def.foundIconSprite = true;
             difficulty55Def.iconSprite = MonsoonIcon;
             DifficultyAPI.AddDifficulty(difficulty55Def);
-            LanguageAPI.Add(difficulty55Def.nameToken, "Impossible 1");
+            LanguageAPI.Add(difficulty55Def.nameToken, "Insane 1");
             LanguageAPI.Add(difficulty55Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+175%</style></style>");
 
-            difficulty6Def = new(6f, "DestinyDifficulty_6_NAME", "Step13", "DestinyDifficulty_6_DESCRIPTION",
+            difficulty60Def = new(6f, "DestinyDifficulty_60_NAME", "Step13", "DestinyDifficulty_60_DESCRIPTION",
                 ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
-            difficulty6Def.foundIconSprite = true;
-            difficulty6Def.iconSprite = MonsoonIcon;
-            DifficultyAPI.AddDifficulty(difficulty6Def);
-            LanguageAPI.Add(difficulty6Def.nameToken, "Impossible 2");
-            LanguageAPI.Add(difficulty6Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+200%</style></style>");
+            difficulty60Def.foundIconSprite = true;
+            difficulty60Def.iconSprite = MonsoonIcon;
+            DifficultyAPI.AddDifficulty(difficulty60Def);
+            LanguageAPI.Add(difficulty60Def.nameToken, "Insane 2");
+            LanguageAPI.Add(difficulty60Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+200%</style></style>");
 
-            Logger.LogInfo(DifficultyCatalog.difficultyDefs);
+            difficulty65Def = new(6.5f, "DestinyDifficulty_65_NAME", "Step13", "DestinyDifficulty_65_DESCRIPTION",
+                ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
+            difficulty65Def.foundIconSprite = true;
+            difficulty65Def.iconSprite = MonsoonIcon;
+            DifficultyAPI.AddDifficulty(difficulty65Def);
+            LanguageAPI.Add(difficulty65Def.nameToken, "Impossible 1");
+            LanguageAPI.Add(difficulty65Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+225%</style></style>");
+
+            difficulty70Def = new(7f, "DestinyDifficulty_70_NAME", "Step13", "DestinyDifficulty_70_DESCRIPTION",
+                ColorCatalog.GetColor(ColorCatalog.ColorIndex.LunarCoin), "de", true);
+            difficulty70Def.foundIconSprite = true;
+            difficulty70Def.iconSprite = MonsoonIcon;
+            DifficultyAPI.AddDifficulty(difficulty70Def);
+            LanguageAPI.Add(difficulty70Def.nameToken, "Impossible 2");
+            LanguageAPI.Add(difficulty70Def.descriptionToken, "<style=cStack>>Health Regeneration: <style=cIsHealth>-40%</style> \n>Difficulty Scaling: <style=cIsHealth>+250%</style></style>");
         }
 
 

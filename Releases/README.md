@@ -4,15 +4,10 @@ This is mod for Risk of Rain2([Steam](https://store.steampowered.com/app/632360/
 
 日本語は英語のあとに続きます。(See below for the Japanese version.)
 
-## Update
-Removed Scrappers BeGone and Ephemeral_Coins from dependencies. Please delete it by yourself.
-
-依存関係からScrappersBeGoneとEphemeral_Coinsを取り除きました。各自で削除してください。
-
 ## English
 A mod inspired by Vampire Survivors[(Steam)](https://store.steampowered.com/app/1794680/Vampire_Survivors/). With a number of changes, we aim to make the game a little more strategic.
 
-When you open the chest, the item selection orb will appear. Two item choices will be drawn from {possessed items + one random item}, and you can choose from those two.
+When you open the chest, the item selection orb will appear. Two item choices will be drawn from {possessed items + one random item}, and you can choose from those options.
 By collecting the items you want in the first stage, those items will be given priority in subsequent chests. It will lead to success that select items strategically.
 
 From Ver2.0, "Limited item slot" system is introduced. When the item slot limit is reached, only the possessed items will come out from the chests. Fill the slots with only the items you want.
@@ -33,19 +28,17 @@ The item slot limit has been introduced with reference to Vampire Survivors. By 
 After filling the limited slot, only the items you have will come out from the chest. Fill the slots with only the items you want.
 <img src='https://user-images.githubusercontent.com/5510944/159090734-890a96ed-6c8d-4963-96e9-09aef089a969.png' width=50%>
 
-### Probability of adding possessed items to the item picker
-- White item: 100%
-- Green item: 20%
-- Red item: 1%
-- Boss item: 1%
-- Lunar item: 0%
-- Corrupt(Void) item: See probability of original item
-
 ### Difficulty adjustment
-It's easy because you can choose the item. So I added 3 more difficult difficulty harder than Monsoon.
+It's easy because you can choose the item. Therefore, we have added more difficult difficulty levels than Monsoon.
+- When the difficulty level of vanilla is 100%, 200%, 300%
 - Difficulty 400%
 - Difficulty 450%
 - Difficulty 500%
+- Difficulty 550%
+- Difficulty 600%
+- Difficulty 650%
+- Difficulty 700%
+- In these difficulty levels, the difficulty level increase in stage change is lowered, and the difficulty level increase in time is increased.
 
 ### Configurable changes
 - OSP Thureshold: One Shot Protection is set to 80% (adjustable), so you won't take more than 80% damage.
@@ -53,17 +46,15 @@ It's easy because you can choose the item. So I added 3 more difficult difficult
 - Max Heal per Second: You can limit the amount of heal per second. If set to 1, it will behave the same as vanilla. Less than 1 is the act like you are having Corpse Bloom. The default is 1, which remains vanilla. If you exceed the maximum heal amount per second, you can carry over heal amount up to 200%.
 - Money Scaling: Scaling the price to open a chest.
 - Possessed Item Chance: The probability that your item will be added to the Item Picker lottery candidates. The higher it is, the easier it is for your items to appear as candidates.
-- The spawn rate of Scrapper, MultiShop, 3D Printer, and Altar of Luck can now be adjusted. It is also possible to set it does not appear.
+- The spawn rate of Scrapper, MultiShop, 3D Printer, Void Item Pod, and Altar of Luck can now be adjusted. It is also possible to set it does not appear. The total spawn amount combined with these can also be adjusted.
 - The upper limit of the item slot. It can be set for each white item and green item.
-- You can reload Config with F2 key.
+- You can reload Config with F5 key.
 
 ### Other changes
 - An item selection orb appears instead of an item from the box
-- Item selection orb options is selected from the items you have. Game make choice at the moment you open the orb. The options are determined by the item of the person who opened it.
-- Remove scrapper.
+- Item selection orb options is selected from the items you have. Game make choice at the moment you open the orb. The options are determined by the item of the person who opened the orb.
 - The amount of HP increase for each Lv of the character is increased by 1.5 times. When the level goes up, HP will reach about (Original * 1.5).
-- 1.5 times the number of monster spawns on difficulty LV 1-9
-- The number of monster spawns is 1.25 times on difficulty levels Lv 10-15.
+- The number of monster spawns is 1.25 times on enemy Lv 1-3.
 - Scaling the amount of money needed to open the box has increased significantly from 1.25 to 1.45
 
 ### Multiplay
@@ -95,19 +86,17 @@ Vampire Survivorsを参考にアイテムの枠上限が導入されました。
 <img src='https://user-images.githubusercontent.com/5510944/159090734-890a96ed-6c8d-4963-96e9-09aef089a969.png' width=50%>
 
 
-### アイテムピッカーへの所持アイテムの追加確率
-- White item: 100%
-- Green item: 20%
-- Red item: 1%
-- Boss item: 1%
-- Lunar item: 0%
-- Corrupt(Void) item: 元のアイテムの確率を参照
-
 ### 難易度調節
 アイテムが選べるので簡単になります。そこでMonsoonよりさらに難しい難易度を３つ追加しました。
+- バニラの難易度を100%, 200%, 300%とした場合
 - 難易度 400%
 - 難易度 450%
 - 難易度 500%
+- 難易度 550%
+- 難易度 600%
+- 難易度 650%
+- 難易度 700%
+- これらの難易度では、ステージ移動での難易度上昇を下げ、時間での難易度上昇を上げています。
 
 ### 設定可能な変更
 - OSP Thureshold: One Shot Protectionを80%(調整可)にしてあるので、80%以上のダメージを食らうことがありません。
@@ -115,17 +104,15 @@ Vampire Survivorsを参考にアイテムの枠上限が導入されました。
 - Max Heal per Second: 秒間ヒール量に制限をかけられます。1に設定するとバニラと同じ動作になります。1未満はコープスブルームの動作となります。デフォルトは1でバニラのままです。秒間ヒール量の上限を超えた場合、ヒールの持ち越しは200%までです。
 - Money Scaling: チェストを開ける値段のスケーリング。
 - Possessed Item Chance: 所持アイテムがItem Pickerの抽選候補に加えられる確率。高くするほど、所持アイテムが候補に出やすくなります。
-- Scrapper, MultiShop, 3D Printer, 運の祭壇の出現率が調整可能になりました。出現しなくなる設定も可能です。
+- Scrapper, MultiShop, 3D Printer, 運の祭壇, Void Item Podの出現率が調整可能になりました。出現しなくなる設定も可能です。これらを合わせた総出現量も調整可能です。
 - アイテム枠の上限。白アイテムと緑アイテムそれぞれに設定可能です。
-- F2キーでConfigを再読み込みできます。
+- F5キーでConfigを再読み込みできます。
 
 ### その他の変更
 - 箱からアイテムの代わりにアイテム選択オーブが出現
 - アイテム選択オーブの選択肢が、手持ちのアイテムから選ばれるように変更。アイテム選択オーブを開けた瞬間に、開けた人のアイテムによって中身が決まります。
-- スクラッパーの消去。
 - キャラクターのLvごとのHP上昇量を1.5倍。レベルが上がりきったとき、HPは約1.5倍になります
-- 難易度LV 1~9でモンスターのスポーン数1.5倍
-- 難易度Lv10~15でモンスターのスポーン数1.25倍
+- 敵のLv1～3でモンスターのスポーン数1.25倍
 - 箱を開けるのに必要なお金の量のスケーリングを1.25から1.45へかなり上昇
 
 ### マルチプレイ
@@ -133,6 +120,15 @@ Vampire Survivorsを参考にアイテムの枠上限が導入されました。
 Modが入った人同士で問題なく動くことを確認しています。
 
 ## Changelog
+**2.1.1**
+- Add 4 more difficulty.
+- the difficulty level increase in stage change is lowered, and the difficulty level increase in time is increased.
+- You can now adjust the number of spawn of the Void pods.
+- Fixed so that only Void items can be seen from the Void keybox.
+
+**2.1.0**
+- Fixed the lottery algorithm. The rarity of item picker choices is now unified.
+
 **2.0.3**
 - Fix item picker's lock algorithm. Please update.
 
